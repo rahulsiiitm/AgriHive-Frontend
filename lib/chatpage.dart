@@ -1,14 +1,13 @@
-// ignore_for_file: use_build_context_synchronously, avoid_print
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-// ignore: depend_on_referenced_packages
 import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:my_app/chat_history_sidebar.dart';
 
@@ -346,15 +345,20 @@ ${info.replaceAll('. ', '.\n\n')}
         ),
       );
 
-      print("Sending image: ${pickedFile.name}, Size: $fileSize bytes");
+      // Use a logging framework or remove in production
+      log("Sending image: ${pickedFile.name}, Size: $fileSize bytes" as num);
 
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 90),
       );
       final res = await http.Response.fromStream(streamedResponse);
 
-      print("Response status: ${res.statusCode}");
-      print("Response body: ${res.body}");
+      if (kDebugMode) {
+        print("Response status: ${res.statusCode}");
+      }
+      if (kDebugMode) {
+        print("Response body: ${res.body}");
+      }
 
       if (res.statusCode == 200) {
         try {
@@ -384,7 +388,9 @@ ${info.replaceAll('. ', '.\n\n')}
               text: "❌ Invalid response format from server",
             );
           });
-          print("JSON decode error: $jsonError");
+          if (kDebugMode) {
+            print("JSON decode error: $jsonError");
+          }
         }
       } else {
         setState(() {
@@ -440,7 +446,9 @@ ${info.replaceAll('. ', '.\n\n')}
         }
       });
       _showSnackBar("Image processing error: ${e.toString()}");
-      print("Detailed error: $e");
+      if (kDebugMode) {
+        print("Detailed error: $e");
+      }
     } finally {
       setState(() => isLoading = false);
     }

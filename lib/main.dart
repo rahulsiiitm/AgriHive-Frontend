@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'chatpage.dart';
+import 'package:my_app/management.dart';
+// import 'chatpage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AgriChat',
       theme: ThemeData(primarySwatch: Colors.green),
-      home: const ChatPage(),
+      home: PlantationManagementPage(),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -27,8 +28,10 @@ Future<List<ChatHistoryItem>> fetchChatHistory({
 
   final response = await http.get(url);
 
-  print('Response status: ${response.statusCode}');
-  print('Response body: ${response.body}');
+  if (kDebugMode) {
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+  }
 
   if (response.statusCode == 200) {
     final Map<String, dynamic> jsonData = json.decode(response.body);
@@ -59,8 +62,12 @@ Future<bool> deleteAllChatsApi({String userId = 'user1'}) async {
       body: json.encode({'userId': userId}),
     );
 
-    print('Delete response status: ${response.statusCode}');
-    print('Delete response body: ${response.body}');
+    if (kDebugMode) {
+      print('Delete response status: ${response.statusCode}');
+    }
+    if (kDebugMode) {
+      print('Delete response body: ${response.body}');
+    }
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonData = json.decode(response.body);
@@ -69,7 +76,9 @@ Future<bool> deleteAllChatsApi({String userId = 'user1'}) async {
       return false;
     }
   } catch (e) {
-    print('Error deleting chats: $e');
+    if (kDebugMode) {
+      print('Error deleting chats: $e');
+    }
     return false;
   }
 }
@@ -368,10 +377,7 @@ class ChatHistorySidebar extends StatelessWidget {
         return AlertDialog(
           title: const Text(
             'Clear Chat History',
-            style: TextStyle(
-              fontFamily: 'lufga',
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontFamily: 'lufga', fontWeight: FontWeight.bold),
           ),
           content: const Text(
             'Are you sure you want to delete all chat history? This action cannot be undone.',
@@ -473,7 +479,9 @@ class _ChatHistorySidebarContainerState
       });
     } catch (e) {
       // Handle error - for now just print
-      print('Error fetching chats: $e');
+      if (kDebugMode) {
+        print('Error fetching chats: $e');
+      }
       setState(() {
         isLoading = false;
       });
