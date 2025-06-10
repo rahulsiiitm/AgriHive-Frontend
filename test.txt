@@ -10,7 +10,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 // ignore: depend_on_referenced_packages
 import 'package:http_parser/http_parser.dart' as http_parser;
-import 'package:my_app/chat_history_sidebar.dart';
+
+// Import the separate history sidebar widget
+import 'chat_history_sidebar.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -23,22 +25,23 @@ class _ChatPageState extends State<ChatPage> {
   final ImagePicker _picker = ImagePicker();
   final List<ChatMessage> messages = [];
 
-  final ChatUser user = ChatUser(id: "user1", firstName: "You");
+  final ChatUser user = ChatUser(id: "0", firstName: "You");
   final ChatUser bot = ChatUser(
-    id: "bot",
+    id: "1",
     firstName: "AgriBot",
     profileImage: "assets/images/app_icon.png",
   );
 
   bool isLoading = false;
-  bool isSidebarVisible = false;
-  String? selectedChatId;
-  String? currentChatId; // Track current chat ID
+  bool showHistory = false;
+  List<ChatHistoryItem> chatHistory = [];
+  bool isLoadingHistory = false;
 
   @override
   void initState() {
     super.initState();
     _addWelcomeMessage();
+    _loadChatHistory();
   }
 
   void _addWelcomeMessage() {
@@ -58,6 +61,74 @@ I'm your agricultural assistant, here to help you with:
 
     setState(() {
       messages.insert(0, welcomeMessage);
+    });
+  }
+
+  // Load chat history (mock data for now)
+  void _loadChatHistory() {
+    setState(() {
+      isLoadingHistory = true;
+    });
+
+    // Simulate API call
+    Future.delayed(const Duration(seconds: 1), () {
+      setState(() {
+        chatHistory = [
+          ChatHistoryItem(
+            id: "1",
+            title: "Plant Disease Detection",
+            lastMessage: "The plant appears to have bacterial leaf spot...",
+            createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+            messageCount: 12,
+          ),
+          ChatHistoryItem(
+            id: "2",
+            title: "Crop Management Tips",
+            lastMessage: "For better yield, consider these irrigation techniques...",
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+            messageCount: 8,
+          ),
+          ChatHistoryItem(
+            id: "3",
+            title: "Pest Control Advice",
+            lastMessage: "Integrated pest management approach would be...",
+            createdAt: DateTime.now().subtract(const Duration(days: 3)),
+            messageCount: 15,
+          ),
+          ChatHistoryItem(
+            id: "4",
+            title: "Soil Analysis Questions",
+            lastMessage: "The pH level seems to be affecting growth...",
+            createdAt: DateTime.now().subtract(const Duration(days: 5)),
+            messageCount: 6,
+          ),
+          ChatHistoryItem(
+            id: "5",
+            title: "Fertilizer Recommendations",
+            lastMessage: "NPK ratio for your crop should be...",
+            createdAt: DateTime.now().subtract(const Duration(days: 7)),
+            messageCount: 10,
+          ),
+        ];
+        isLoadingHistory = false;
+      });
+    });
+  }
+
+  // Handle chat history selection
+  void _onChatSelected(String chatId) {
+    // TODO: Load selected chat messages
+    print("Loading chat: $chatId");
+    setState(() {
+      showHistory = false;
+    });
+    
+    // Show loading message
+    _showSnackBar("Loading chat history...");
+    
+    // Simulate loading chat
+    Future.delayed(const Duration(seconds: 1), () {
+      _showSnackBar("Chat loaded successfully!");
     });
   }
 
@@ -102,7 +173,7 @@ I'm your agricultural assistant, here to help you with:
             TextSpan(
               text: normalText,
               style: TextStyle(
-                fontFamily: 'lufga',
+                fontFamily: 'LufgaSemiBold',
                 fontSize: 14,
                 height: 1.4,
                 color: textColor,
@@ -122,10 +193,10 @@ I'm your agricultural assistant, here to help you with:
           TextSpan(
             text: content,
             style: TextStyle(
-              fontFamily: 'lufga',
+              fontFamily: 'LufgaSemiBold',
               fontSize: 14,
               height: 1.4,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.bold,
               color: textColor,
             ),
           ),
@@ -136,7 +207,7 @@ I'm your agricultural assistant, here to help you with:
           TextSpan(
             text: content,
             style: TextStyle(
-              fontFamily: 'lufga',
+              fontFamily: 'LufgaSemiBold',
               fontSize: 14,
               height: 1.4,
               fontStyle: FontStyle.italic,
@@ -154,7 +225,7 @@ I'm your agricultural assistant, here to help you with:
         TextSpan(
           text: text.substring(currentIndex),
           style: TextStyle(
-            fontFamily: 'lufga',
+            fontFamily: 'LufgaSemiBold',
             fontSize: 14,
             height: 1.4,
             color: textColor,
@@ -168,7 +239,7 @@ I'm your agricultural assistant, here to help you with:
       return Text(
         text,
         style: TextStyle(
-          fontFamily: 'lufga',
+          fontFamily: 'LufgaSemiBold',
           fontSize: 14,
           height: 1.4,
           color: textColor,
@@ -188,8 +259,6 @@ ${info.replaceAll('. ', '.\n\n')}
 
 💡 **Need more help?** *Feel free to ask questions about this plant!*""";
   }
-
-  // ----------------------------------------------------------------------------------------------------------
 
   Future<void> sendMessage(ChatMessage message) async {
     // Check connectivity
@@ -213,30 +282,16 @@ ${info.replaceAll('. ', '.\n\n')}
     setState(() => messages.insert(0, botMsg));
 
     try {
-      // Prepare request body with chat management
-      final requestBody = {"message": message.text, "user_id": user.id};
-
-      // Include chat_id if we have one
-      if (currentChatId != null) {
-        requestBody["chat_id"] = currentChatId!;
-      }
-
       final res = await http
           .post(
             Uri.parse("http://10.0.2.2:5000/chat"),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(requestBody),
+            body: jsonEncode({"message": message.text}),
           )
           .timeout(const Duration(seconds: 30));
 
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
-
-        // Update current chat ID if this was a new chat
-        if (data["is_new_chat"] == true || currentChatId == null) {
-          currentChatId = data["chat_id"];
-        }
-
         setState(() {
           messages[0] = ChatMessage(
             user: bot,
@@ -331,12 +386,6 @@ ${info.replaceAll('. ', '.\n\n')}
 
       request.headers.addAll({'Accept': 'application/json'});
 
-      // Add user_id and chat_id to form data
-      request.fields['user_id'] = user.id;
-      if (currentChatId != null) {
-        request.fields['chat_id'] = currentChatId!;
-      }
-
       request.files.add(
         await http.MultipartFile.fromPath(
           'image',
@@ -359,12 +408,6 @@ ${info.replaceAll('. ', '.\n\n')}
       if (res.statusCode == 200) {
         try {
           final data = json.decode(res.body);
-
-          // Update current chat ID if this was a new chat
-          if (data["is_new_chat"] == true || currentChatId == null) {
-            currentChatId = data["chat_id"];
-          }
-
           final label = data["predicted_label"] ?? "Unknown";
           final info =
               data["gemini_explanation"] ?? "No explanation available.";
@@ -453,7 +496,7 @@ ${info.replaceAll('. ', '.\n\n')}
         content: Text(
           message,
           style: const TextStyle(
-            fontFamily: 'lufga',
+            fontFamily: 'LufgaSemiBold',
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -466,148 +509,78 @@ ${info.replaceAll('. ', '.\n\n')}
     );
   }
 
-  void _toggleSidebar() {
-    setState(() {
-      isSidebarVisible = !isSidebarVisible;
-    });
-  }
-
-  void _closeSidebar() {
-    setState(() {
-      isSidebarVisible = false;
-    });
-  }
-
-  void _startNewChat() {
-    setState(() {
-      currentChatId = null;
-      selectedChatId = null;
-      messages.clear();
-      _addWelcomeMessage();
-      isSidebarVisible = false;
-    });
-  }
-
-  void _onChatSelected(String chatId) async {
-    setState(() {
-      selectedChatId = chatId;
-      currentChatId = chatId;
-      isSidebarVisible = false;
-      isLoading = true;
-    });
-
-    try {
-      final userId = user.id;
-
-      final res = await http.get(
-        Uri.parse("http://10.0.2.2:5000/getChat?userId=$userId&chatId=$chatId"),
-        headers: {'Accept': 'application/json'},
-      );
-
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-
-        final List<ChatMessage> loadedMessages =
-            (data['messages'] as List)
-                .map(
-                  (msg) => ChatMessage(
-                    user: msg['sender'] == "user" ? user : bot,
-                    createdAt: DateTime.parse(msg['timestamp']),
-                    text: msg['message'],
-                  ),
-                )
-                .toList()
-                .reversed
-                .toList(); // DashChat expects most recent at start
-
-        setState(() {
-          messages.clear();
-          messages.addAll(loadedMessages);
-        });
-      } else {
-        _showSnackBar("Failed to load chat: ${res.statusCode}");
-      }
-    } catch (e) {
-      _showSnackBar("Error loading chat: ${e.toString()}");
-    } finally {
-      setState(() => isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Theme(
       data: Theme.of(context).copyWith(
-        textTheme: Theme.of(context).textTheme.apply(fontFamily: 'lufga'),
+        textTheme: Theme.of(context).textTheme.apply(fontFamily: 'LufgaSemiBold'),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "🌱 AgriChat",
-                style: TextStyle(
-                  fontFamily: 'lufga',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20,
-                ),
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: Colors.grey.shade50,
+            appBar: AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
               ),
-              const Text(
-                "Your Smart Farming Assistant",
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w300,
-                  color: Colors.white70,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.green.shade600,
-          foregroundColor: Colors.white,
-          elevation: 2,
-          shadowColor: Color.fromRGBO(0, 128, 0, 0.3),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _startNewChat,
-              tooltip: "New Chat",
-            ),
-            IconButton(
-              icon: const Icon(Icons.history),
-              onPressed: _toggleSidebar,
-              tooltip: "Chat History",
-            ),
-            if (isLoading)
-              const Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
+              title: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "🌱 AgriChat",
+                    style: TextStyle(
+                      fontFamily: 'LufgaSemiBold',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
                   ),
+                  Text(
+                    "Your Smart Farming Assistant",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              shadowColor: Colors.green.withOpacity(0.3),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.history),
+                  onPressed: () {
+                    setState(() {
+                      showHistory = true;
+                    });
+                  },
+                ),
+                if (isLoading)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 16),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            body: Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/images/background.jpg'),
+                  fit: BoxFit.cover,
+                  opacity: 1.0,
                 ),
               ),
-          ],
-        ),
-        body: Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/background.jpg'),
-              fit: BoxFit.cover,
-              opacity: 1.0,
-            ),
-          ),
-          child: Stack(
-            children: [
-              DashChat(
+              child: DashChat(
                 currentUser: user,
                 onSend: sendMessage,
                 messages: messages,
@@ -615,7 +588,7 @@ ${info.replaceAll('. ', '.\n\n')}
                   inputDecoration: InputDecoration(
                     hintText: "Ask about agriculture...",
                     hintStyle: TextStyle(
-                      fontFamily: 'lufga',
+                      fontFamily: 'LufgaSemiBold',
                       color: Colors.grey.shade500,
                     ),
                     border: OutlineInputBorder(
@@ -624,10 +597,7 @@ ${info.replaceAll('. ', '.\n\n')}
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(25),
-                      borderSide: BorderSide(
-                        color: Colors.grey.shade300,
-                        width: 1,
-                      ),
+                      borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(25),
@@ -637,39 +607,35 @@ ${info.replaceAll('. ', '.\n\n')}
                       ),
                     ),
                     filled: true,
-                    fillColor: Color.fromRGBO(255, 255, 255, 0.90),
+                    fillColor: Colors.white.withOpacity(0.95),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 12,
                     ),
                   ),
-                  inputTextStyle: const TextStyle(
-                    fontFamily: 'lufga',
-                    fontWeight: FontWeight.w600,
-                  ),
-                  sendButtonBuilder:
-                      (onSend) => Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade600,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color.fromRGBO(0, 128, 0, 0.3),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                  inputTextStyle: const TextStyle(fontFamily: 'LufgaSemiBold'),
+                  sendButtonBuilder: (onSend) => Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade600,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.green.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
-                        child: IconButton(
-                          onPressed: onSend,
-                          icon: const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      onPressed: onSend,
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
                       ),
+                    ),
+                  ),
                   trailing: [
                     Container(
                       decoration: BoxDecoration(
@@ -677,7 +643,7 @@ ${info.replaceAll('. ', '.\n\n')}
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Color.fromRGBO(0, 128, 0, 0.2),
+                            color: Colors.green.withOpacity(0.2),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -687,10 +653,9 @@ ${info.replaceAll('. ', '.\n\n')}
                         onPressed: isLoading ? null : sendImage,
                         icon: Icon(
                           Icons.photo_camera_rounded,
-                          color:
-                              isLoading
-                                  ? Colors.grey.shade400
-                                  : Colors.green.shade700,
+                          color: isLoading 
+                              ? Colors.grey.shade400 
+                              : Colors.green.shade700,
                           size: 20,
                         ),
                       ),
@@ -698,33 +663,37 @@ ${info.replaceAll('. ', '.\n\n')}
                   ],
                 ),
                 messageOptions: MessageOptions(
-                  currentUserContainerColor: Color.fromRGBO(67, 160, 71, 0.9),
-                  containerColor: Color.fromRGBO(255, 255, 255, 0.95),
+                  currentUserContainerColor: Colors.green.shade600.withOpacity(0.9),
+                  containerColor: Colors.white.withOpacity(0.95),
                   textColor: Colors.grey.shade800,
                   currentUserTextColor: Colors.white,
                   messagePadding: const EdgeInsets.all(16),
-                  borderRadius: 7,
+                  borderRadius: 16,
                   messageTextBuilder: (message, previousMessage, nextMessage) {
-                    final textColor =
-                        message.user.id == user.id
-                            ? Colors.white
-                            : Colors.grey.shade800;
+                    final textColor = message.user.id == user.id
+                        ? Colors.white
+                        : Colors.grey.shade800;
 
                     return _buildFormattedText(message.text, textColor);
                   },
                   showTime: true,
                 ),
               ),
-
-              // The chat history sidebar container
-              ChatHistorySidebarContainer(
-                isVisible: isSidebarVisible,
-                onClose: _closeSidebar,
-                onChatSelected: _onChatSelected,
-              ),
-            ],
+            ),
           ),
-        ),
+          // Chat History Sidebar Overlay
+          if (showHistory)
+            ChatHistorySidebar(
+              chatHistory: chatHistory,
+              isLoading: isLoadingHistory,
+              onChatSelected: _onChatSelected,
+              onClose: () {
+                setState(() {
+                  showHistory = false;
+                });
+              }, isVisible: showHistory,
+            ),
+        ],
       ),
     );
   }

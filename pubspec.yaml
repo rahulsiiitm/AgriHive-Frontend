@@ -30,9 +30,52 @@ flutter:
     - assets/images/Background2.jpg
     - assets/images/path1.png
     - assets/images/rice.jpg
-  
-  fonts:
-    - family: LufgaSemiBold
-      fonts:
-        - asset: assets/fonts/LufgaSemiBold.ttf
 
+  fonts:
+    - family: lufga
+      fonts:
+        - asset: assets/fonts/lufga/LufgaThin.ttf
+          weight: 100
+        - asset: assets/fonts/lufga/LufgaThinItalic.ttf
+          weight: 100
+          style: italic
+        - asset: assets/fonts/lufga/LufgaExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/lufga/LufgaExtraLightItalic.ttf
+          weight: 200
+          style: italic
+        - asset: assets/fonts/lufga/LufgaLight.ttf
+          weight: 300
+        - asset: assets/fonts/lufga/LufgaLightItalic.ttf
+          weight: 300
+          style: italic
+        - asset: assets/fonts/lufga/LufgaRegular.ttf
+          weight: 400
+        - asset: assets/fonts/lufga/LufgaItalic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/lufga/LufgaMedium.ttf
+          weight: 500
+        - asset: assets/fonts/lufga/LufgaMediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/lufga/LufgaSemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/lufga/LufgaSemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/lufga/LufgaBold.ttf
+          weight: 700
+        - asset: assets/fonts/lufga/LufgaBoldItalic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/lufga/LufgaExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/lufga/LufgaExtraBoldItalic.ttf
+          weight: 800
+          style: italic
+        - asset: assets/fonts/lufga/LufgaBlack.ttf
+          weight: 900
+        - asset: assets/fonts/lufga/LufgaBlackItalic.ttf
+          weight: 900
+          style: italic
