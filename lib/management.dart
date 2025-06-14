@@ -1,5 +1,8 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -114,7 +117,9 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         errorMessage = 'Network error: Unable to connect to server';
         isLoading = false;
       });
-      print('Error fetching crops: $e'); // For debugging
+      if (kDebugMode) {
+        print('Error fetching crops: $e');
+      } // For debugging
     }
   }
 
@@ -139,11 +144,15 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
             ) ??
             false;
       } else {
-        print("Server error: ${response.statusCode}");
+        if (kDebugMode) {
+          print("Server error: ${response.statusCode}");
+        }
         return false;
       }
     } catch (e) {
-      print("Error occurred: $e");
+      if (kDebugMode) {
+        print("Error occurred: $e");
+      }
       return false;
     }
   }
@@ -285,11 +294,15 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to delete: ${response.body}');
+        if (kDebugMode) {
+          print('Failed to delete: ${response.body}');
+        }
         return false;
       }
     } catch (e) {
-      print('Error deleting crop: $e');
+      if (kDebugMode) {
+        print('Error deleting crop: $e');
+      }
       return false;
     }
   }
@@ -314,151 +327,20 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         }),
       );
 
-      print('Status: ${response.statusCode}');
-      print('Body: ${response.body}');
+      if (kDebugMode) {
+        print('Status: ${response.statusCode}');
+      }
+      if (kDebugMode) {
+        print('Body: ${response.body}');
+      }
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error updating crop: $e');
+      if (kDebugMode) {
+        print('Error updating crop: $e');
+      }
       return false;
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/plantation.jpg'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Custom AppBar with back button and Plantation text
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.green[700],
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'Plantation',
-                          style: TextStyle(
-                            fontFamily: 'lufga',
-                            color: Colors.white,
-                            fontSize: 25,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(width: 56),
-                  ],
-                ),
-              ),
-
-              // First division - Show current user info
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Welcome, $userId',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Manage your plantation here',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Second division - Bottom section for database data (2/3 of page)
-              Expanded(
-                flex: 7,
-                child: Container(
-                  width: double.infinity,
-                  margin: EdgeInsets.all(0),
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Color.fromRGBO(255, 255, 255, 0),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(left: 10, top: 0),
-                            child: Text(
-                              'My Crops',
-                              style: TextStyle(
-                                fontSize: 25,
-                                fontFamily: 'lufga',
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.refresh, color: Colors.white),
-                            onPressed: fetchCrops,
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 2),
-                      Expanded(child: buildCropsList()),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showAddCropDialog(context, userId);
-        },
-        backgroundColor: Colors.green[700],
-        child: Icon(Icons.add, color: Colors.white, size: 30),
-      ),
-    );
   }
 
   void showUpdateDialog(BuildContext context, String userId, Map crop) {
@@ -558,6 +440,224 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/plantation.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Custom AppBar with back button and Plantation text
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green[700],
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'Plantation',
+                          style: TextStyle(
+                            fontFamily: 'lufga',
+                            color: Colors.white,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(width: 56),
+                  ],
+                ),
+              ),
+
+              // First division - Show current user info
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  margin: EdgeInsets.only(
+                                    left: 16,
+                                    top: 8,
+                                    bottom: 8,
+                                    right: 8,
+                                  ),
+                                  padding: EdgeInsets.all(10),
+                                  height:
+                                      double
+                                          .infinity, // ⬅️ This makes the box stretch to max height
+                                  decoration: BoxDecoration(
+                                    color: Color.fromARGB(51, 5, 74, 41),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: Color.fromARGB(127, 76, 175, 80),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment
+                                            .start, // Optional: center the text horizontally
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment
+                                            .start, // Optional: center the text vertically
+                                    children: [
+                                      Text(
+                                        'Todays Suggestion',
+                                        style: TextStyle(
+                                          fontFamily: 'lufga',
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      // Text(data: ' (User: $userId)',
+                                      //     style: TextStyle(
+                                      //       fontFamily: 'lufga',
+                                      //       color: Colors.white,
+                                      //       fontSize: 15,
+                                      //     )),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              Expanded(
+                                flex: 1,
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        margin: EdgeInsets.only(
+                                          right: 16,
+                                          left: 8,
+                                          top: 8,
+                                          bottom: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Color.fromARGB(48, 5, 74, 41),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border.all(
+                                            color: Color.fromARGB(
+                                              127,
+                                              76,
+                                              175,
+                                              80,
+                                            ),
+                                            width: 1,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(bottom: 8),
+                                      child: Text(
+                                        'Random',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Second division - Bottom section for database data (2/3 of page)
+              Expanded(
+                flex: 7,
+                child: Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.all(0),
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Color.fromRGBO(255, 255, 255, 0),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(left: 10, top: 0),
+                            child: Text(
+                              'My Crops',
+                              style: TextStyle(
+                                fontSize: 25,
+                                fontFamily: 'lufga',
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.refresh, color: Colors.white),
+                            onPressed: fetchCrops,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 2),
+                      Expanded(child: buildCropsList()),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showAddCropDialog(context, userId);
+        },
+        backgroundColor: Colors.green[700],
+        child: Icon(Icons.add, color: Colors.white, size: 30),
+      ),
+    );
+  }
+
   Widget buildCropsList() {
     if (isLoading) {
       return Center(child: CircularProgressIndicator());
@@ -626,146 +726,173 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
               child: AnimatedContainer(
                 duration: Duration(milliseconds: 150),
                 curve: Curves.easeInOut,
-                child: Card(
-                  color: Color.fromARGB(48, 5, 74, 41),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: BorderSide(
-                      color: Color.fromARGB(127, 76, 175, 80),
-                      width: 1,
-                    ),
-                  ),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    splashColor: const Color.fromARGB(
-                      127,
-                      76,
-                      175,
-                      80,
-                    ).withOpacity(0.1),
-                    highlightColor: const Color.fromARGB(
-                      127,
-                      76,
-                      175,
-                      80,
-                    ).withOpacity(0.05),
-                    onTap: () {
-                      // Optional: Add tap functionality if needed
-                    },
-                    child: Container(
-                      width: double.infinity, // Force full width
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Card(
+                      color: Color.fromARGB(48, 5, 74, 41),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(
+                          color: Color.fromARGB(127, 76, 175, 80),
+                          width: 1,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        splashColor: const Color.fromARGB(
+                          127,
+                          76,
+                          175,
+                          80,
+                        ).withOpacity(0.1),
+                        highlightColor: const Color.fromARGB(
+                          127,
+                          76,
+                          175,
+                          80,
+                        ).withOpacity(0.05),
+                        onTap: () {
+                          // Optional: Add tap functionality if needed
+                        },
+                        child: Container(
+                          width: double.infinity, // Force full width
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.grass, color: Colors.white, size: 35),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      crop.name,
-                                      style: TextStyle(
-                                        fontFamily: 'lufga',
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.grass,
                                         color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                        size: 35,
                                       ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'Sowed on: ${crop.plantedDate ?? "Unknown"}',
-                                      style: TextStyle(color: Colors.white70),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                '${crop.area ?? "Unknown"} acres',
-                                style: TextStyle(
-                                  color: Colors.yellow[500],
-                                  fontFamily: 'lufga',
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.delete,
-                                  color: Colors.redAccent,
-                                  size: 35,
-                                ),
-                                onPressed: () {
-                                  // Handle deletion
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) {
-                                      return AlertDialog(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        title: Text('Delete Crop'),
-                                        content: Text(
-                                          'Are you sure you want to delete ${crop.name}?',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                            child: Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () async {
-                                              bool success =
-                                                  await deleteCropFromDatabase(
-                                                    userId,
-                                                    crop.id,
-                                                  );
-
-                                              Navigator.of(
-                                                context,
-                                              ).pop(); // Close the dialog first
-
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    success
-                                                        ? 'Crop deleted successfully'
-                                                        : 'Failed to delete crop',
-                                                  ),
-                                                ),
-                                              );
-
-                                              if (success) {
-                                                fetchCrops();
-                                              }
-                                            },
-                                            child: Text(
-                                              'Delete',
+                                      SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              crop.name,
                                               style: TextStyle(
-                                                color: Colors.red,
+                                                fontFamily: 'lufga',
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
+                                            SizedBox(height: 4),
+                                            Text(
+                                              'Sowed on:',
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            Text(
+                                              crop.plantedDate ?? "Unknown",
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        '${crop.area ?? "Unknown"} acres',
+                                        style: TextStyle(
+                                          color: Colors.yellow[500],
+                                          fontFamily: 'lufga',
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.delete,
+                                          color: Colors.redAccent,
+                                          size: 35,
+                                        ),
+                                        onPressed: () {
+                                          // Handle deletion
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) {
+                                              return AlertDialog(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                title: Text('Delete Crop'),
+                                                content: Text(
+                                                  'Are you sure you want to delete ${crop.name}?',
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop();
+                                                    },
+                                                    child: Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () async {
+                                                      bool success =
+                                                          await deleteCropFromDatabase(
+                                                            userId,
+                                                            crop.id,
+                                                          );
+
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop(); // Close the dialog first
+
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            success
+                                                                ? 'Crop deleted successfully'
+                                                                : 'Failed to delete crop',
+                                                          ),
+                                                        ),
+                                                      );
+
+                                                      if (success) {
+                                                        fetchCrops();
+                                                      }
+                                                    },
+                                                    child: Text(
+                                                      'Delete',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

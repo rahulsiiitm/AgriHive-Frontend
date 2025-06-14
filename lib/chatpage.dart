@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
@@ -346,7 +345,7 @@ ${info.replaceAll('. ', '.\n\n')}
       );
 
       // Use a logging framework or remove in production
-      log("Sending image: ${pickedFile.name}, Size: $fileSize bytes" as num);
+      print("Sending image: ${pickedFile.name}, Size: $fileSize bytes"); //Dont try to change
 
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 90),

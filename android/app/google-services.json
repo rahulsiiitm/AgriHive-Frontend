@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "421583588543",
+    "project_id": "agrihive-c8f6b",
+    "storage_bucket": "agrihive-c8f6b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:421583588543:android:2fc78524309cd2ddc64a0a",
+        "android_client_info": {
+          "package_name": "com.example.agrihive"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZhh2Yl7HBi7AzV6PS-mJ4atKen6h0Kzs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

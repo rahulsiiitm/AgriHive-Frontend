@@ -16,6 +16,8 @@ dependencies:
   connectivity_plus: ^5.0.2
   dash_chat_2: ^0.0.19
   http_parser: ^4.1.2
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.8
 
 dev_dependencies:
   flutter_test:
