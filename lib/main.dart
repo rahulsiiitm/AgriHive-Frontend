@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:my_app/management.dart';
-// import 'chatpage.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/login_screen.dart';
+import 'home.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'AgriChat',
+      title: 'Firebase Auth Test',
       theme: ThemeData(primarySwatch: Colors.green),
-      home: PlantationManagementPage(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) return const HomePage(userId: '',);
+          return const LoginScreen();
+        },
+      ),
     );
   }
 }

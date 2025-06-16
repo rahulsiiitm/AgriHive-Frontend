@@ -1,0 +1,25 @@
+{
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "agrihive-c8f6b",
+                    "appId": "1:421583588543:android:3c2a97bc404b5ad9c64a0a",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "agrihive-c8f6b",
+                    "configurations": {
+                        "android": "1:421583588543:android:3c2a97bc404b5ad9c64a0a",
+                        "ios": "1:421583588543:ios:7c66816d079de298c64a0a",
+                        "macos": "1:421583588543:ios:7c66816d079de298c64a0a",
+                        "web": "1:421583588543:web:f746b54f20374e54c64a0a",
+                        "windows": "1:421583588543:web:5298ad35cda34ae1c64a0a"
+                    }
+                }
+            }
+        }
+    }
+}
