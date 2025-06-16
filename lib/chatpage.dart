@@ -1,3 +1,4 @@
+// chat_page.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -11,7 +12,9 @@ import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:my_app/chat_history_sidebar.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  final String userId;
+
+  const ChatPage({super.key, required this.userId});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -20,8 +23,14 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final ImagePicker _picker = ImagePicker();
   final List<ChatMessage> messages = [];
+  late String userId;
 
-  final ChatUser user = ChatUser(id: "user1", firstName: "You");
+  // Use the actual userId from widget
+  late final ChatUser user = ChatUser(
+    id: widget.userId, // This will now use the actual passed userId
+    firstName: "You",
+  );
+
   final ChatUser bot = ChatUser(
     id: "bot",
     firstName: "AgriBot",
@@ -31,12 +40,18 @@ class _ChatPageState extends State<ChatPage> {
   bool isLoading = false;
   bool isSidebarVisible = false;
   String? selectedChatId;
-  String? currentChatId; // Track current chat ID
+  String? currentChatId;
 
   @override
   void initState() {
     super.initState();
+    userId = widget.userId;
     _addWelcomeMessage();
+
+    // Debug print to verify correct userId is being used
+    if (kDebugMode) {
+      print("ChatPage initialized with userId: $userId");
+    }
   }
 
   void _addWelcomeMessage() {
@@ -187,8 +202,6 @@ ${info.replaceAll('. ', '.\n\n')}
 💡 **Need more help?** *Feel free to ask questions about this plant!*""";
   }
 
-  // ----------------------------------------------------------------------------------------------------------
-
   Future<void> sendMessage(ChatMessage message) async {
     // Check connectivity
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -211,12 +224,20 @@ ${info.replaceAll('. ', '.\n\n')}
     setState(() => messages.insert(0, botMsg));
 
     try {
-      // Prepare request body with chat management
-      final requestBody = {"message": message.text, "user_id": user.id};
+      // Prepare request body with chat management - using the actual userId
+      final requestBody = {
+        "message": message.text,
+        "user_id": widget.userId, // Use widget.userId directly for consistency
+      };
 
       // Include chat_id if we have one
       if (currentChatId != null) {
         requestBody["chat_id"] = currentChatId!;
+      }
+
+      // Debug print to verify correct userId is being sent
+      if (kDebugMode) {
+        print("Sending message with userId: ${widget.userId}");
       }
 
       final res = await http
@@ -329,10 +350,15 @@ ${info.replaceAll('. ', '.\n\n')}
 
       request.headers.addAll({'Accept': 'application/json'});
 
-      // Add user_id and chat_id to form data
-      request.fields['user_id'] = user.id;
+      // Add user_id and chat_id to form data - using actual userId
+      request.fields['user_id'] = widget.userId; // Use widget.userId directly
       if (currentChatId != null) {
         request.fields['chat_id'] = currentChatId!;
+      }
+
+      // Debug print to verify correct userId is being sent
+      if (kDebugMode) {
+        print("Sending image with userId: ${widget.userId}");
       }
 
       request.files.add(
@@ -345,7 +371,7 @@ ${info.replaceAll('. ', '.\n\n')}
       );
 
       // Use a logging framework or remove in production
-      print("Sending image: ${pickedFile.name}, Size: $fileSize bytes"); //Dont try to change
+      print("Sending image: ${pickedFile.name}, Size: $fileSize bytes");
 
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 90),
@@ -354,8 +380,6 @@ ${info.replaceAll('. ', '.\n\n')}
 
       if (kDebugMode) {
         print("Response status: ${res.statusCode}");
-      }
-      if (kDebugMode) {
         print("Response body: ${res.body}");
       }
 
@@ -479,12 +503,6 @@ ${info.replaceAll('. ', '.\n\n')}
     });
   }
 
-  void _closeSidebar() {
-    setState(() {
-      isSidebarVisible = false;
-    });
-  }
-
   void _startNewChat() {
     setState(() {
       currentChatId = null;
@@ -493,52 +511,6 @@ ${info.replaceAll('. ', '.\n\n')}
       _addWelcomeMessage();
       isSidebarVisible = false;
     });
-  }
-
-  void _onChatSelected(String chatId) async {
-    setState(() {
-      selectedChatId = chatId;
-      currentChatId = chatId;
-      isSidebarVisible = false;
-      isLoading = true;
-    });
-
-    try {
-      final userId = user.id;
-
-      final res = await http.get(
-        Uri.parse("http://10.0.2.2:5000/getChat?userId=$userId&chatId=$chatId"),
-        headers: {'Accept': 'application/json'},
-      );
-
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-
-        final List<ChatMessage> loadedMessages =
-            (data['messages'] as List)
-                .map(
-                  (msg) => ChatMessage(
-                    user: msg['sender'] == "user" ? user : bot,
-                    createdAt: DateTime.parse(msg['timestamp']),
-                    text: msg['message'],
-                  ),
-                )
-                .toList()
-                .reversed
-                .toList(); // DashChat expects most recent at start
-
-        setState(() {
-          messages.clear();
-          messages.addAll(loadedMessages);
-        });
-      } else {
-        _showSnackBar("Failed to load chat: ${res.statusCode}");
-      }
-    } catch (e) {
-      _showSnackBar("Error loading chat: ${e.toString()}");
-    } finally {
-      setState(() => isLoading = false);
-    }
   }
 
   @override
@@ -726,8 +698,12 @@ ${info.replaceAll('. ', '.\n\n')}
               // The chat history sidebar container
               ChatHistorySidebarContainer(
                 isVisible: isSidebarVisible,
-                onClose: _closeSidebar,
-                onChatSelected: _onChatSelected,
+                onClose: () => setState(() => isSidebarVisible = false),
+                onChatSelected: (chatId) {
+                  // Handle chat selection
+                  print('Selected chat: $chatId');
+                },
+                userId: widget.userId, // Pass the actual user ID here
               ),
             ],
           ),

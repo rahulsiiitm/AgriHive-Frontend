@@ -22,7 +22,7 @@ class ChatHistoryItem {
 
 // API service function to fetch chat history
 Future<List<ChatHistoryItem>> fetchChatHistory({
-  String userId = 'user1',
+  required String userId, // Made required instead of optional with default
 }) async {
   final url = Uri.parse('http://10.0.2.2:5000/getChats?userId=$userId');
 
@@ -52,7 +52,7 @@ Future<List<ChatHistoryItem>> fetchChatHistory({
 }
 
 // API service function to delete all chats
-Future<bool> deleteAllChatsApi({String userId = 'user1'}) async {
+Future<bool> deleteAllChatsApi({required String userId}) async { // Made required
   final url = Uri.parse('http://10.0.2.2:5000/deleteAllChats');
 
   try {
@@ -440,12 +440,14 @@ class ChatHistorySidebarContainer extends StatefulWidget {
   final bool isVisible;
   final VoidCallback onClose;
   final Function(String chatId) onChatSelected;
+  final String userId; // Add userId parameter
 
   const ChatHistorySidebarContainer({
     super.key,
     required this.isVisible,
     required this.onClose,
     required this.onChatSelected,
+    required this.userId, // Make userId required
   });
 
   @override
@@ -458,12 +460,21 @@ class _ChatHistorySidebarContainerState
   List<ChatHistoryItem> chats = [];
   bool isLoading = true;
   bool isDeleting = false;
-  String userId = 'user1'; // for testing
 
   @override
   void initState() {
     super.initState();
     _loadChats();
+  }
+
+  // Add this method to handle userId changes
+  @override
+  void didUpdateWidget(ChatHistorySidebarContainer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload chats if userId changed
+    if (oldWidget.userId != widget.userId) {
+      _loadChats();
+    }
   }
 
   Future<void> _loadChats() async {
@@ -472,7 +483,7 @@ class _ChatHistorySidebarContainerState
     });
 
     try {
-      final fetchedChats = await fetchChatHistory(userId: userId);
+      final fetchedChats = await fetchChatHistory(userId: widget.userId);
       setState(() {
         chats = fetchedChats;
         isLoading = false;
@@ -504,7 +515,7 @@ class _ChatHistorySidebarContainerState
     });
 
     try {
-      final success = await deleteAllChatsApi(userId: userId);
+      final success = await deleteAllChatsApi(userId: widget.userId);
 
       if (success) {
         setState(() {
