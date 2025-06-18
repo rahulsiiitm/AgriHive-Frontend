@@ -69,7 +69,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
     super.initState();
     _pages = [
       HomePage(),
-      PlantationManagementPage(),
+      PlantationManagementPage(userId: widget.userId),
       SizedBox(), // FAB placeholder
       IoTPage(),
       ProfilePage(),

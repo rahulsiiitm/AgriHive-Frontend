@@ -5,6 +5,8 @@ import 'chatpage.dart';
 class HomePage extends StatelessWidget {
   final AuthService _authService = AuthService();
 
+  HomePage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -44,20 +46,20 @@ class HomePage extends StatelessWidget {
                   ),
                 );
               },
-              child: Text('Open Chat'),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
               ),
+              child: Text('Open Chat'),
             ),
             SizedBox(height: 20),
             OutlinedButton(
               onPressed: () async {
                 await _authService.signOut();
               },
-              child: Text('Logout'),
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
               ),
+              child: Text('Logout'),
             ),
           ],
         ),

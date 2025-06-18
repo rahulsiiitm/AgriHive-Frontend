@@ -34,7 +34,12 @@ class Crop {
 }
 
 class PlantationManagementPage extends StatefulWidget {
-  const PlantationManagementPage({super.key});
+  final String userId; // Add userId parameter
+  
+  const PlantationManagementPage({
+    super.key,
+    required this.userId, // Make userId required
+  });
 
   @override
   State<PlantationManagementPage> createState() =>
@@ -46,9 +51,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
   bool isLoading = true;
   String errorMessage = '';
 
-  // For testing purposes, using "user1" as default userId
-  // In production, this should come from authentication/login state
-  final String userId = "user1";
+  // Use the userId from widget parameter
+  String get userId => widget.userId;
 
   @override
   void initState() {
@@ -467,16 +471,6 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                 ),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                    ),
                     Expanded(
                       child: Center(
                         child: Text(
@@ -490,7 +484,6 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                         ),
                       ),
                     ),
-                    Container(width: 56),
                   ],
                 ),
               ),
@@ -545,12 +538,6 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                      // Text(data: ' (User: $userId)',
-                                      //     style: TextStyle(
-                                      //       fontFamily: 'lufga',
-                                      //       color: Colors.white,
-                                      //       fontSize: 15,
-                                      //     )),
                                     ],
                                   ),
                                 ),
