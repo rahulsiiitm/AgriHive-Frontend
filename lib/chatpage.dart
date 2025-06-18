@@ -202,7 +202,7 @@ class _ChatPageState extends State<ChatPage> {
       'createdAt': message.createdAt.millisecondsSinceEpoch,
       'medias': message.medias?.map((media) => {
         'url': media.url,
-        'fileName': media.fileName ?? '',
+        'fileName': media.fileName,
         'type': media.type.toString(),
       }).toList(),
     };

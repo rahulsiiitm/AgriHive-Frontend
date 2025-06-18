@@ -1,6 +1,5 @@
-// weather_card.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'dart:ui';
 
 class WeatherCard extends StatelessWidget {
   final Map<String, dynamic>? weatherData;
@@ -8,7 +7,7 @@ class WeatherCard extends StatelessWidget {
   final bool isLoading;
 
   const WeatherCard({
-    Key? key, 
+    Key? key,
     required this.weatherData,
     this.onRefresh,
     this.isLoading = false,
@@ -16,13 +15,8 @@ class WeatherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return _buildLoadingCard();
-    }
-
-    if (weatherData == null) {
-      return _buildErrorCard('No weather data available');
-    }
+    if (isLoading) return _buildLoadingCard();
+    if (weatherData == null) return _buildErrorCard('No weather data available');
 
     final current = weatherData!['current'] ?? {};
     final location = weatherData!['location'] ?? 'Unknown Location';
@@ -31,288 +25,204 @@ class WeatherCard extends StatelessWidget {
     final error = weatherData!['error'];
 
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Main weather card
-          Card(
-            elevation: 8,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _getGradientColors(current['description']?.toString() ?? ''),
-                ),
+      padding: const EdgeInsets.all(12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.15),
+                  Colors.white.withOpacity(0.05),
+                ],
               ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header with location and refresh button
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Location Info
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          location,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        if (coordinates != null)
+                          Text(
+                            '${coordinates['lat']?.toStringAsFixed(2)}, ${coordinates['lon']?.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white70,
+                            ),
+                          ),
+                      ],
+                    ),
+                    // Refresh Button
+                    if (onRefresh != null)
+                      IconButton(
+                        onPressed: onRefresh,
+                        icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Temperature and Icon Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Temp & Description
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              location,
+                              current['temperature']?.toString() ?? '--',
                               style: const TextStyle(
-                                fontSize: 22,
+                                fontSize: 40,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
-                            if (coordinates != null)
-                              Text(
-                                '${coordinates['lat']?.toStringAsFixed(2)}, ${coordinates['lon']?.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
-                                ),
-                              ),
+                            const Text(
+                              '°C',
+                              style: TextStyle(fontSize: 20, color: Colors.white70),
+                            ),
                           ],
                         ),
-                      ),
-                      if (onRefresh != null)
-                        IconButton(
-                          onPressed: onRefresh,
-                          icon: const Icon(Icons.refresh, color: Colors.white),
-                          tooltip: 'Refresh Weather',
+                        Text(
+                          current['description']?.toString().toUpperCase() ?? 'N/A',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Main temperature display
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      ],
+                    ),
+                    // Weather Icon
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        _getWeatherEmoji(current['description'] ?? ''),
+                        style: const TextStyle(fontSize: 36),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Details Section
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.25)),
+                      ),
+                      child: Column(
                         children: [
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '${current['temperature']?.toString() ?? '--'}',
-                                style: const TextStyle(
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                              Expanded(
+                                child: _buildDetailItem(
+                                  '🌡️ Feels Like',
+                                  '${current['feels_like']?.toString() ?? '--'}°C',
                                 ),
                               ),
-                              const Text(
-                                '°C',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  color: Colors.white70,
+                              Expanded(
+                                child: _buildDetailItem(
+                                  '💧 Humidity',
+                                  '${current['humidity']?.toString() ?? '--'}%',
                                 ),
                               ),
                             ],
                           ),
-                          Text(
-                            current['description']?.toString().toUpperCase() ?? 'N/A',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildDetailItem(
+                                  '💨 Wind',
+                                  '${current['wind_speed']?.toString() ?? '--'} m/s',
+                                ),
+                              ),
+                              Expanded(
+                                child: _buildDetailItem(
+                                  '🌊 Pressure',
+                                  '${current['pressure']?.toString() ?? '--'} hPa',
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      // Weather icon (you can replace with actual weather icons)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: const BoxDecoration(
-                          color: Colors.white24,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          _getWeatherEmoji(current['description']?.toString() ?? ''),
-                          style: const TextStyle(fontSize: 40),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Weather details grid
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Column(
+                  ),
+                ),
+
+                // Error Section
+                if (error != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                    ),
+                    child: Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetailItem(
-                                '🌡️ Feels Like',
-                                '${current['feels_like']?.toString() ?? '--'}°C',
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildDetailItem(
-                                '💧 Humidity',
-                                '${current['humidity']?.toString() ?? '--'}%',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetailItem(
-                                '💨 Wind Speed',
-                                '${current['wind_speed']?.toString() ?? '--'} m/s',
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildDetailItem(
-                                '🌊 Pressure',
-                                '${current['pressure']?.toString() ?? '--'} hPa',
-                              ),
-                            ),
-                          ],
+                        const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            error,
+                            style: const TextStyle(color: Colors.orange, fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  
-                  // Error message if any
-                  if (error != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withOpacity(0.5)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline, color: Colors.orange, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              error,
-                              style: const TextStyle(
-                                color: Colors.orange,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
-              ),
-            ),
-          ),
-          
-          // Forecast card
-          if (forecast.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '📅 24-Hour Forecast',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 120,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: forecast.length,
-                        itemBuilder: (context, index) {
-                          final item = forecast[index];
-                          return _buildForecastItem(item);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingCard() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          height: 200,
-          padding: const EdgeInsets.all(20),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Loading weather data...'),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorCard(String message) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              if (onRefresh != null) ...[
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
-                ),
-              ],
-            ],
           ),
         ),
       ),
@@ -323,20 +233,13 @@ class WeatherCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white70,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        const SizedBox(height: 3),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 16,
             color: Colors.white,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -344,84 +247,25 @@ class WeatherCard extends StatelessWidget {
     );
   }
 
-  Widget _buildForecastItem(Map<String, dynamic> item) {
-    final date = DateTime.tryParse(item['date']?.toString() ?? '');
-    final timeStr = date != null ? DateFormat('HH:mm').format(date) : 'N/A';
-    final temp = item['temp']?.toString() ?? '--';
-    final description = item['description']?.toString() ?? '';
-    final rain = item['rain']?.toString() ?? '0';
-
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            timeStr,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            _getWeatherEmoji(description),
-            style: const TextStyle(fontSize: 24),
-          ),
-          Text(
-            '${temp}°',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (rain != '0')
-            Text(
-              '💧${rain}mm',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.blue.shade600,
-              ),
-            ),
-        ],
-      ),
+  Widget _buildLoadingCard() {
+    return const Center(
+      child: CircularProgressIndicator(),
     );
   }
 
-  List<Color> _getGradientColors(String description) {
-    final desc = description.toLowerCase();
-    if (desc.contains('clear') || desc.contains('sunny')) {
-      return [Colors.orange.shade400, Colors.deepOrange.shade600];
-    } else if (desc.contains('cloud')) {
-      return [Colors.grey.shade400, Colors.grey.shade600];
-    } else if (desc.contains('rain') || desc.contains('shower')) {
-      return [Colors.blue.shade400, Colors.blue.shade600];
-    } else if (desc.contains('thunder')) {
-      return [Colors.purple.shade400, Colors.purple.shade700];
-    } else if (desc.contains('snow')) {
-      return [Colors.lightBlue.shade200, Colors.lightBlue.shade400];
-    } else {
-      return [Colors.teal.shade400, Colors.teal.shade600];
-    }
+  Widget _buildErrorCard(String message) {
+    return Center(
+      child: Text(message, style: const TextStyle(color: Colors.red)),
+    );
   }
 
   String _getWeatherEmoji(String description) {
-    final desc = description.toLowerCase();
-    if (desc.contains('clear') || desc.contains('sunny')) return '☀️';
-    if (desc.contains('few clouds')) return '🌤️';
-    if (desc.contains('scattered clouds')) return '⛅';
-    if (desc.contains('broken clouds') || desc.contains('overcast')) return '☁️';
-    if (desc.contains('shower rain')) return '🌦️';
-    if (desc.contains('rain')) return '🌧️';
-    if (desc.contains('thunderstorm')) return '⛈️';
-    if (desc.contains('snow')) return '🌨️';
-    if (desc.contains('mist') || desc.contains('fog')) return '🌫️';
-    return '🌤️'; // default
+    final d = description.toLowerCase();
+    if (d.contains('sun')) return '☀️';
+    if (d.contains('cloud')) return '☁️';
+    if (d.contains('rain')) return '🌧️';
+    if (d.contains('storm')) return '⛈️';
+    if (d.contains('snow')) return '❄️';
+    return '🌡️';
   }
 }

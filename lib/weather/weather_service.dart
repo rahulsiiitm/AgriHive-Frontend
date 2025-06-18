@@ -73,7 +73,7 @@ class WeatherService {
 
     // Check if we should use cached data
     if (!forceRefresh) {
-      final cachedData = await _getCachedWeather(latitude!, longitude!);
+      final cachedData = await _getCachedWeather(latitude, longitude);
       if (cachedData != null) {
         print('Using cached weather data');
         return cachedData;
@@ -81,7 +81,7 @@ class WeatherService {
     }
 
     // Fetch fresh data
-    return await _fetchAndCacheWeather(latitude!, longitude!);
+    return await _fetchAndCacheWeather(latitude, longitude);
   }
 
   Future<Map<String, dynamic>?> _getCachedWeather(double lat, double lon) async {
