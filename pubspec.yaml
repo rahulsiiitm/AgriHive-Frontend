@@ -18,7 +18,10 @@ dependencies:
   http_parser: ^4.1.2
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
-  cloud_firestore: ^4.15.0 # or latest
+  # cloud_firestore: ^4.15.0 # or latest
+  shared_preferences: ^2.2.2  # For local caching
+  geolocator: ^10.1.0
+  intl: ^0.18.1  # For date formatting
 
 dev_dependencies:
   flutter_test:
@@ -34,6 +37,7 @@ flutter:
     - assets/images/Background2.jpg
     - assets/images/path1.png
     - assets/images/rice.jpg
+    - assets/images/image1.jpg
     - assets/images/plantation.jpg
 
   fonts:

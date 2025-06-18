@@ -648,12 +648,15 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showAddCropDialog(context, userId);
-        },
-        backgroundColor: Colors.green[700],
-        child: Icon(Icons.add, color: Colors.white, size: 30),
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 100), // Adjust height as needed
+        child: FloatingActionButton(
+          onPressed: () {
+            showAddCropDialog(context, userId);
+          },
+          backgroundColor: Colors.green[700],
+          child: Icon(Icons.add, color: Colors.white, size: 30),
+        ),
       ),
     );
   }
