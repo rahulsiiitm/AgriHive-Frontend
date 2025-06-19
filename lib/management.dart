@@ -35,7 +35,7 @@ class Crop {
 
 class PlantationManagementPage extends StatefulWidget {
   final String userId; // Add userId parameter
-  
+
   const PlantationManagementPage({
     super.key,
     required this.userId, // Make userId required
@@ -80,7 +80,9 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:5000/getCrops?userId=$userId'),
+        Uri.parse(
+          'https://agrihive-server91.onrender.com/getCrops?userId=$userId',
+        ),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -132,7 +134,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     List<Map<String, dynamic>> cropData,
   ) async {
     const String apiUrl =
-        "http://10.0.2.2:5000/addCrop"; // change to your actual URL
+        "https://agrihive-server91.onrender.com/addCrop"; // change to your actual URL
 
     try {
       final response = await http.post(
@@ -285,7 +287,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
 
   Future<bool> deleteCropFromDatabase(String userId, String cropId) async {
     final url = Uri.parse(
-      'http://10.0.2.2:5000/deleteCrop',
+      'https://agrihive-server91.onrender.com/deleteCrop',
     ); // replace with your endpoint
 
     try {
@@ -317,7 +319,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     Map<String, dynamic> cropData,
   ) async {
     final url = Uri.parse(
-      'http://10.0.2.2:5000/updateCrop',
+      'https://agrihive-server91.onrender.com/updateCrop',
     ); // use your correct API
 
     try {

@@ -31,10 +31,7 @@ class _ChatPageState extends State<ChatPage> {
   static const String _cacheTimestampKey = 'cache_timestamp_';
   static const Duration _cacheExpiry = Duration(hours: 24);
 
-  late final ChatUser user = ChatUser(
-    id: widget.userId,
-    firstName: "You",
-  );
+  late final ChatUser user = ChatUser(id: widget.userId, firstName: "You");
 
   final ChatUser bot = ChatUser(
     id: "bot",
@@ -56,7 +53,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _initializeCache() async {
     _prefs = await SharedPreferences.getInstance();
     await _loadCurrentChatFromCache();
-    
+
     if (messages.isEmpty) {
       _addWelcomeMessage();
     }
@@ -66,8 +63,13 @@ class _ChatPageState extends State<ChatPage> {
     if (_prefs == null) return;
 
     try {
-      final cacheTimestamp = _prefs!.getInt('${_cacheTimestampKey}${widget.userId}') ?? 0;
-      final isExpired = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(cacheTimestamp)) > _cacheExpiry;
+      final cacheTimestamp =
+          _prefs!.getInt('${_cacheTimestampKey}${widget.userId}') ?? 0;
+      final isExpired =
+          DateTime.now().difference(
+            DateTime.fromMillisecondsSinceEpoch(cacheTimestamp),
+          ) >
+          _cacheExpiry;
 
       if (isExpired) {
         await _clearCurrentChatCache();
@@ -76,14 +78,19 @@ class _ChatPageState extends State<ChatPage> {
 
       // Load current chat ID
       currentChatId = _prefs!.getString('${_currentChatIdKey}${widget.userId}');
-      
+
       // Load only current chat messages
       if (currentChatId != null) {
-        final cachedMessagesJson = _prefs!.getString('${_currentChatMessagesKey}${widget.userId}_$currentChatId');
+        final cachedMessagesJson = _prefs!.getString(
+          '${_currentChatMessagesKey}${widget.userId}_$currentChatId',
+        );
         if (cachedMessagesJson != null) {
           final messagesList = json.decode(cachedMessagesJson) as List;
-          final cachedMessages = messagesList.map((msgJson) => _deserializeChatMessage(msgJson)).toList();
-          
+          final cachedMessages =
+              messagesList
+                  .map((msgJson) => _deserializeChatMessage(msgJson))
+                  .toList();
+
           setState(() {
             messages.clear();
             messages.addAll(cachedMessages);
@@ -99,10 +106,20 @@ class _ChatPageState extends State<ChatPage> {
     if (_prefs == null || currentChatId == null) return;
 
     try {
-      final messagesJson = messages.map((msg) => _serializeChatMessage(msg)).toList();
-      await _prefs!.setString('${_currentChatMessagesKey}${widget.userId}_$currentChatId', json.encode(messagesJson));
-      await _prefs!.setString('${_currentChatIdKey}${widget.userId}', currentChatId!);
-      await _prefs!.setInt('${_cacheTimestampKey}${widget.userId}', DateTime.now().millisecondsSinceEpoch);
+      final messagesJson =
+          messages.map((msg) => _serializeChatMessage(msg)).toList();
+      await _prefs!.setString(
+        '${_currentChatMessagesKey}${widget.userId}_$currentChatId',
+        json.encode(messagesJson),
+      );
+      await _prefs!.setString(
+        '${_currentChatIdKey}${widget.userId}',
+        currentChatId!,
+      );
+      await _prefs!.setInt(
+        '${_cacheTimestampKey}${widget.userId}',
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (e) {
       // Silently handle cache errors
     }
@@ -110,10 +127,12 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _clearCurrentChatCache() async {
     if (_prefs == null) return;
-    
+
     // Clear current chat cache
     if (currentChatId != null) {
-      await _prefs!.remove('${_currentChatMessagesKey}${widget.userId}_$currentChatId');
+      await _prefs!.remove(
+        '${_currentChatMessagesKey}${widget.userId}_$currentChatId',
+      );
     }
     await _prefs!.remove('${_currentChatIdKey}${widget.userId}');
     await _prefs!.remove('${_cacheTimestampKey}${widget.userId}');
@@ -122,7 +141,7 @@ class _ChatPageState extends State<ChatPage> {
   // Load specific chat from backend
   Future<void> _loadChatFromBackend(String chatId) async {
     if (isLoadingChat) return;
-    
+
     setState(() {
       isLoadingChat = true;
     });
@@ -134,16 +153,22 @@ class _ChatPageState extends State<ChatPage> {
         return;
       }
 
-      final response = await http.get(
-        Uri.parse("http://10.0.2.2:5000/getChat?chatId=$chatId&userId=${widget.userId}"),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .get(
+            Uri.parse(
+              "https://agrihive-server91.onrender.com/getChat?chatId=$chatId&userId=${widget.userId}",
+            ),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         // Save current chat before switching
-        if (currentChatId != null && currentChatId != chatId && messages.isNotEmpty) {
+        if (currentChatId != null &&
+            currentChatId != chatId &&
+            messages.isNotEmpty) {
           await _saveCurrentChatToCache();
         }
 
@@ -156,19 +181,22 @@ class _ChatPageState extends State<ChatPage> {
         // Parse and load messages from backend response
         if (data['messages'] != null) {
           final chatMessages = <ChatMessage>[];
-          
+
           for (var messageData in data['messages']) {
-            final isBot = messageData['sender'] == 'bot' || messageData['sender'] == 'assistant';
+            final isBot =
+                messageData['sender'] == 'bot' ||
+                messageData['sender'] == 'assistant';
             final chatUser = isBot ? bot : user;
-            
+
             final message = ChatMessage(
               user: chatUser,
               text: messageData['content'] ?? messageData['message'] ?? '',
-              createdAt: messageData['timestamp'] != null 
-                ? DateTime.parse(messageData['timestamp'])
-                : DateTime.now(),
+              createdAt:
+                  messageData['timestamp'] != null
+                      ? DateTime.parse(messageData['timestamp'])
+                      : DateTime.now(),
             );
-            
+
             chatMessages.add(message);
           }
 
@@ -180,7 +208,6 @@ class _ChatPageState extends State<ChatPage> {
 
         // Cache the loaded chat
         await _saveCurrentChatToCache();
-        
       } else {
         _showSnackBar("Failed to load chat: ${response.statusCode}");
       }
@@ -200,11 +227,16 @@ class _ChatPageState extends State<ChatPage> {
       'userProfileImage': message.user.profileImage ?? '',
       'text': message.text,
       'createdAt': message.createdAt.millisecondsSinceEpoch,
-      'medias': message.medias?.map((media) => {
-        'url': media.url,
-        'fileName': media.fileName,
-        'type': media.type.toString(),
-      }).toList(),
+      'medias':
+          message.medias
+              ?.map(
+                (media) => {
+                  'url': media.url,
+                  'fileName': media.fileName,
+                  'type': media.type.toString(),
+                },
+              )
+              .toList(),
     };
   }
 
@@ -212,16 +244,22 @@ class _ChatPageState extends State<ChatPage> {
     final user = ChatUser(
       id: json['userId'],
       firstName: json['userFirstName'],
-      profileImage: json['userProfileImage'].isEmpty ? null : json['userProfileImage'],
+      profileImage:
+          json['userProfileImage'].isEmpty ? null : json['userProfileImage'],
     );
 
     List<ChatMedia>? medias;
     if (json['medias'] != null) {
-      medias = (json['medias'] as List).map((mediaJson) => ChatMedia(
-        url: mediaJson['url'],
-        fileName: mediaJson['fileName'],
-        type: _parseMediaType(mediaJson['type']),
-      )).toList();
+      medias =
+          (json['medias'] as List)
+              .map(
+                (mediaJson) => ChatMedia(
+                  url: mediaJson['url'],
+                  fileName: mediaJson['fileName'],
+                  type: _parseMediaType(mediaJson['type']),
+                ),
+              )
+              .toList();
     }
 
     return ChatMessage(
@@ -234,10 +272,14 @@ class _ChatPageState extends State<ChatPage> {
 
   MediaType _parseMediaType(String typeString) {
     switch (typeString) {
-      case 'MediaType.image': return MediaType.image;
-      case 'MediaType.video': return MediaType.video;
-      case 'MediaType.file': return MediaType.file;
-      default: return MediaType.image;
+      case 'MediaType.image':
+        return MediaType.image;
+      case 'MediaType.video':
+        return MediaType.video;
+      case 'MediaType.file':
+        return MediaType.file;
+      default:
+        return MediaType.image;
     }
   }
 
@@ -275,9 +317,13 @@ I'm your agricultural assistant, here to help you with:
     }
 
     for (final match in italicRegex.allMatches(text)) {
-      bool isPartOfBold = boldRegex.allMatches(text).any((boldMatch) => 
-        match.start >= boldMatch.start && match.end <= boldMatch.end);
-      
+      bool isPartOfBold = boldRegex
+          .allMatches(text)
+          .any(
+            (boldMatch) =>
+                match.start >= boldMatch.start && match.end <= boldMatch.end,
+          );
+
       if (!isPartOfBold) {
         allMatches.add(MapEntry(match.start, 'italic:${match.group(1)}'));
       }
@@ -290,7 +336,17 @@ I'm your agricultural assistant, here to help you with:
       if (match.key > currentIndex) {
         final normalText = text.substring(currentIndex, match.key);
         if (normalText.isNotEmpty) {
-          spans.add(TextSpan(text: normalText, style: TextStyle(fontFamily: 'lufga', fontSize: 14, height: 1.4, color: textColor)));
+          spans.add(
+            TextSpan(
+              text: normalText,
+              style: TextStyle(
+                fontFamily: 'lufga',
+                fontSize: 14,
+                height: 1.4,
+                color: textColor,
+              ),
+            ),
+          );
         }
       }
 
@@ -299,20 +355,60 @@ I'm your agricultural assistant, here to help you with:
       final content = parts[1];
 
       if (type == 'bold') {
-        spans.add(TextSpan(text: content, style: TextStyle(fontFamily: 'lufga', fontSize: 14, height: 1.4, fontWeight: FontWeight.w700, color: textColor)));
+        spans.add(
+          TextSpan(
+            text: content,
+            style: TextStyle(
+              fontFamily: 'lufga',
+              fontSize: 14,
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
+        );
         currentIndex = match.key + content.length + 4;
       } else if (type == 'italic') {
-        spans.add(TextSpan(text: content, style: TextStyle(fontFamily: 'lufga', fontSize: 14, height: 1.4, fontStyle: FontStyle.italic, color: textColor)));
+        spans.add(
+          TextSpan(
+            text: content,
+            style: TextStyle(
+              fontFamily: 'lufga',
+              fontSize: 14,
+              height: 1.4,
+              fontStyle: FontStyle.italic,
+              color: textColor,
+            ),
+          ),
+        );
         currentIndex = match.key + content.length + 2;
       }
     }
 
     if (currentIndex < text.length) {
-      spans.add(TextSpan(text: text.substring(currentIndex), style: TextStyle(fontFamily: 'lufga', fontSize: 14, height: 1.4, color: textColor)));
+      spans.add(
+        TextSpan(
+          text: text.substring(currentIndex),
+          style: TextStyle(
+            fontFamily: 'lufga',
+            fontSize: 14,
+            height: 1.4,
+            color: textColor,
+          ),
+        ),
+      );
     }
 
     if (spans.isEmpty) {
-      return Text(text, style: TextStyle(fontFamily: 'lufga', fontSize: 14, height: 1.4, color: textColor));
+      return Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'lufga',
+          fontSize: 14,
+          height: 1.4,
+          color: textColor,
+        ),
+      );
     }
 
     return RichText(text: TextSpan(children: spans));
@@ -348,10 +444,7 @@ ${info.replaceAll('. ', '.\n\n')}
     setState(() => messages.insert(0, botMsg));
 
     try {
-      final requestBody = {
-        "message": message.text,
-        "user_id": widget.userId,
-      };
+      final requestBody = {"message": message.text, "user_id": widget.userId};
 
       if (currentChatId != null) {
         requestBody["chatId"] = currentChatId!;
@@ -359,7 +452,7 @@ ${info.replaceAll('. ', '.\n\n')}
 
       final res = await http
           .post(
-            Uri.parse("http://10.0.2.2:5000/chat"),
+            Uri.parse("https://agrihive-server91.onrender.com/chat"),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(requestBody),
           )
@@ -428,7 +521,9 @@ ${info.replaceAll('. ', '.\n\n')}
       }
 
       if (await file.length() > 5 * 1024 * 1024) {
-        _showSnackBar("Image too large. Please select a smaller image (max 5MB)");
+        _showSnackBar(
+          "Image too large. Please select a smaller image (max 5MB)",
+        );
         return;
       }
 
@@ -458,10 +553,13 @@ ${info.replaceAll('. ', '.\n\n')}
 
       setState(() => messages.insert(0, botMsg));
 
-      var request = http.MultipartRequest('POST', Uri.parse("http://10.0.2.2:5000/analyze_image"));
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("https://agrihive-server91.onrender.com/analyze_image"),
+      );
       request.headers.addAll({'Accept': 'application/json'});
       request.fields['user_id'] = widget.userId;
-      
+
       if (currentChatId != null) {
         request.fields['chatId'] = currentChatId!;
       }
@@ -475,7 +573,9 @@ ${info.replaceAll('. ', '.\n\n')}
         ),
       );
 
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 90));
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 90),
+      );
       final res = await http.Response.fromStream(streamedResponse);
 
       if (res.statusCode == 200) {
@@ -487,7 +587,8 @@ ${info.replaceAll('. ', '.\n\n')}
           }
 
           final label = data["predicted_label"] ?? "Unknown";
-          final info = data["gemini_explanation"] ?? "No explanation available.";
+          final info =
+              data["gemini_explanation"] ?? "No explanation available.";
 
           setState(() {
             messages[0] = ChatMessage(
@@ -517,10 +618,14 @@ ${info.replaceAll('. ', '.\n\n')}
         });
       }
     } on TimeoutException {
-      _updateBotMessage("❌ Request timeout. Please try again with a smaller image.");
+      _updateBotMessage(
+        "❌ Request timeout. Please try again with a smaller image.",
+      );
       _showSnackBar("Request timeout - try a smaller image");
     } on SocketException {
-      _updateBotMessage("❌ Cannot connect to server. Please check if your server is running.");
+      _updateBotMessage(
+        "❌ Cannot connect to server. Please check if your server is running.",
+      );
       _showSnackBar("Server connection failed");
     } on FormatException catch (e) {
       _updateBotMessage("❌ Invalid server response format.");
@@ -549,7 +654,13 @@ ${info.replaceAll('. ', '.\n\n')}
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontFamily: 'lufga', fontWeight: FontWeight.w500)),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'lufga',
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         backgroundColor: Colors.green.shade700,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -587,7 +698,7 @@ ${info.replaceAll('. ', '.\n\n')}
 
     // Load the selected chat
     _loadChatFromBackend(chatId);
-    
+
     setState(() {
       isSidebarVisible = false;
     });
@@ -618,8 +729,22 @@ ${info.replaceAll('. ', '.\n\n')}
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("🌱 AgriChat", style: TextStyle(fontFamily: 'lufga', fontWeight: FontWeight.w600, fontSize: 20)),
-              const Text("Your Smart Farming Assistant", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w300, color: Colors.white70)),
+              const Text(
+                "🌱 AgriChat",
+                style: TextStyle(
+                  fontFamily: 'lufga',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                ),
+              ),
+              const Text(
+                "Your Smart Farming Assistant",
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w300,
+                  color: Colors.white70,
+                ),
+              ),
             ],
           ),
           backgroundColor: Colors.green.shade600,
@@ -627,18 +752,37 @@ ${info.replaceAll('. ', '.\n\n')}
           elevation: 2,
           shadowColor: Color.fromRGBO(0, 128, 0, 0.3),
           actions: [
-            IconButton(icon: const Icon(Icons.add), onPressed: _startNewChat, tooltip: "New Chat"),
-            IconButton(icon: const Icon(Icons.history), onPressed: _toggleSidebar, tooltip: "Chat History"),
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: _startNewChat,
+              tooltip: "New Chat",
+            ),
+            IconButton(
+              icon: const Icon(Icons.history),
+              onPressed: _toggleSidebar,
+              tooltip: "Chat History",
+            ),
             if (isLoading || isLoadingChat)
               const Padding(
                 padding: EdgeInsets.only(right: 16),
-                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                ),
               ),
           ],
         ),
         body: Container(
           decoration: const BoxDecoration(
-            image: DecorationImage(image: AssetImage('assets/images/background.jpg'), fit: BoxFit.cover, opacity: 1.0),
+            image: DecorationImage(
+              image: AssetImage('assets/images/background.jpg'),
+              fit: BoxFit.cover,
+              opacity: 1.0,
+            ),
           ),
           child: Stack(
             children: [
@@ -655,7 +799,10 @@ ${info.replaceAll('. ', '.\n\n')}
                           children: [
                             CircularProgressIndicator(),
                             SizedBox(height: 16),
-                            Text('Loading chat...', style: TextStyle(fontFamily: 'lufga')),
+                            Text(
+                              'Loading chat...',
+                              style: TextStyle(fontFamily: 'lufga'),
+                            ),
                           ],
                         ),
                       ),
@@ -670,34 +817,86 @@ ${info.replaceAll('. ', '.\n\n')}
                   inputOptions: InputOptions(
                     inputDecoration: InputDecoration(
                       hintText: "Ask about agriculture...",
-                      hintStyle: TextStyle(fontFamily: 'lufga', color: Colors.grey.shade500),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide(color: Colors.grey.shade300, width: 1)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide(color: Colors.green.shade400, width: 2)),
+                      hintStyle: TextStyle(
+                        fontFamily: 'lufga',
+                        color: Colors.grey.shade500,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide(
+                          color: Colors.grey.shade300,
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide(
+                          color: Colors.green.shade400,
+                          width: 2,
+                        ),
+                      ),
                       filled: true,
                       fillColor: Color.fromRGBO(255, 255, 255, 0.90),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    ),
-                    inputTextStyle: const TextStyle(fontFamily: 'lufga', fontWeight: FontWeight.w600),
-                    sendButtonBuilder: (onSend) => Container(
-                      margin: const EdgeInsets.only(left: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade600,
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: Color.fromRGBO(0, 128, 0, 0.3), blurRadius: 4, offset: const Offset(0, 2))],
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
                       ),
-                      child: IconButton(onPressed: onSend, icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20)),
                     ),
+                    inputTextStyle: const TextStyle(
+                      fontFamily: 'lufga',
+                      fontWeight: FontWeight.w600,
+                    ),
+                    sendButtonBuilder:
+                        (onSend) => Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color.fromRGBO(0, 128, 0, 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            onPressed: onSend,
+                            icon: const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
                     trailing: [
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.green.shade100,
                           shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Color.fromRGBO(0, 128, 0, 0.2), blurRadius: 4, offset: const Offset(0, 2))],
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color.fromRGBO(0, 128, 0, 0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: IconButton(
-                          onPressed: (isLoading || isLoadingChat) ? null : sendImage,
-                          icon: Icon(Icons.photo_camera_rounded, color: (isLoading || isLoadingChat) ? Colors.grey.shade400 : Colors.green.shade700, size: 20),
+                          onPressed:
+                              (isLoading || isLoadingChat) ? null : sendImage,
+                          icon: Icon(
+                            Icons.photo_camera_rounded,
+                            color:
+                                (isLoading || isLoadingChat)
+                                    ? Colors.grey.shade400
+                                    : Colors.green.shade700,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ],
@@ -709,8 +908,15 @@ ${info.replaceAll('. ', '.\n\n')}
                     currentUserTextColor: Colors.white,
                     messagePadding: const EdgeInsets.all(16),
                     borderRadius: 7,
-                    messageTextBuilder: (message, previousMessage, nextMessage) {
-                      final textColor = message.user.id == user.id ? Colors.white : Colors.grey.shade800;
+                    messageTextBuilder: (
+                      message,
+                      previousMessage,
+                      nextMessage,
+                    ) {
+                      final textColor =
+                          message.user.id == user.id
+                              ? Colors.white
+                              : Colors.grey.shade800;
                       return _buildFormattedText(message.text, textColor);
                     },
                     showTime: true,
@@ -719,7 +925,8 @@ ${info.replaceAll('. ', '.\n\n')}
               ChatHistorySidebarContainer(
                 isVisible: isSidebarVisible,
                 onClose: () => setState(() => isSidebarVisible = false),
-                onChatSelected: _onChatSelected, // Updated to use the new handler
+                onChatSelected:
+                    _onChatSelected, // Updated to use the new handler
                 userId: widget.userId,
               ),
             ],

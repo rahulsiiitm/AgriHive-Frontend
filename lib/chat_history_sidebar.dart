@@ -24,7 +24,9 @@ class ChatHistoryItem {
 Future<List<ChatHistoryItem>> fetchChatHistory({
   required String userId, // Made required instead of optional with default
 }) async {
-  final url = Uri.parse('http://10.0.2.2:5000/getChats?userId=$userId');
+  final url = Uri.parse(
+    'https://agrihive-server91.onrender.com/getChats?userId=$userId',
+  );
 
   final response = await http.get(url);
 
@@ -52,8 +54,11 @@ Future<List<ChatHistoryItem>> fetchChatHistory({
 }
 
 // API service function to delete all chats
-Future<bool> deleteAllChatsApi({required String userId}) async { // Made required
-  final url = Uri.parse('http://10.0.2.2:5000/deleteAllChats');
+Future<bool> deleteAllChatsApi({required String userId}) async {
+  // Made required
+  final url = Uri.parse(
+    'https://agrihive-server91.onrender.com/deleteAllChats',
+  );
 
   try {
     final response = await http.delete(

@@ -6,16 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 
 class WeatherService {
-  static const String baseUrl = 'http://10.0.2.2:5000/weather';
+  static const String baseUrl =
+      'https://agrihive-server91.onrender.com/weather';
   static const int timeoutSeconds = 10;
   static const int cacheExpiryHours = 1;
-  
+
   // Cache keys
   static const String _weatherDataKey = 'weather_data';
   static const String _cacheTimestampKey = 'cache_timestamp';
   static const String _cachedLatKey = 'cached_lat';
   static const String _cachedLonKey = 'cached_lon';
-  
+
   // In-memory cache for current session
   Map<String, dynamic>? _memoryCache;
   DateTime? _memoryCacheTimestamp;
@@ -50,9 +51,9 @@ class WeatherService {
   }
 
   Future<Map<String, dynamic>?> getWeather({
-    double? lat, 
-    double? lon, 
-    required bool forceRefresh
+    double? lat,
+    double? lon,
+    required bool forceRefresh,
   }) async {
     double? latitude = lat;
     double? longitude = lon;
@@ -84,7 +85,10 @@ class WeatherService {
     return await _fetchAndCacheWeather(latitude, longitude);
   }
 
-  Future<Map<String, dynamic>?> _getCachedWeather(double lat, double lon) async {
+  Future<Map<String, dynamic>?> _getCachedWeather(
+    double lat,
+    double lon,
+  ) async {
     try {
       // First check in-memory cache
       if (_isMemoryCacheValid(lat, lon)) {
@@ -94,36 +98,44 @@ class WeatherService {
 
       // Then check persistent storage
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Check if we have cached data
       final cachedDataString = prefs.getString(_weatherDataKey);
       final cacheTimestamp = prefs.getInt(_cacheTimestampKey);
       final cachedLat = prefs.getDouble(_cachedLatKey);
       final cachedLon = prefs.getDouble(_cachedLonKey);
 
-      if (cachedDataString != null && 
-          cacheTimestamp != null && 
-          cachedLat != null && 
+      if (cachedDataString != null &&
+          cacheTimestamp != null &&
+          cachedLat != null &&
           cachedLon != null) {
-        
         // Check if cache is still valid (within 1 hour and same location)
         final cacheTime = DateTime.fromMillisecondsSinceEpoch(cacheTimestamp);
         final now = DateTime.now();
         final timeDifference = now.difference(cacheTime);
-        
+
         // Check if location is approximately the same (within ~1km)
-        final locationDifference = _calculateDistance(lat, lon, cachedLat, cachedLon);
-        
-        if (timeDifference.inHours < cacheExpiryHours && locationDifference < 1.0) {
-          final cachedData = json.decode(cachedDataString) as Map<String, dynamic>;
-          
+        final locationDifference = _calculateDistance(
+          lat,
+          lon,
+          cachedLat,
+          cachedLon,
+        );
+
+        if (timeDifference.inHours < cacheExpiryHours &&
+            locationDifference < 1.0) {
+          final cachedData =
+              json.decode(cachedDataString) as Map<String, dynamic>;
+
           // Update in-memory cache
           _memoryCache = cachedData;
           _memoryCacheTimestamp = cacheTime;
           _memoryCacheLat = cachedLat;
           _memoryCacheLon = cachedLon;
-          
-          print('Using persistent cache (${timeDifference.inMinutes} minutes old)');
+
+          print(
+            'Using persistent cache (${timeDifference.inMinutes} minutes old)',
+          );
           return cachedData;
         } else {
           print('Cache expired or location changed, fetching fresh data');
@@ -132,13 +144,16 @@ class WeatherService {
     } catch (e) {
       print('Error reading cache: $e');
     }
-    
+
     return null;
   }
 
-  Future<Map<String, dynamic>?> _fetchAndCacheWeather(double lat, double lon) async {
+  Future<Map<String, dynamic>?> _fetchAndCacheWeather(
+    double lat,
+    double lon,
+  ) async {
     Map<String, dynamic>? weatherData;
-    
+
     try {
       final response = await http
           .get(Uri.parse('$baseUrl?lat=$lat&lon=$lon'))
@@ -147,7 +162,7 @@ class WeatherService {
       if (response.statusCode == 200) {
         weatherData = json.decode(response.body);
         print('Fetched fresh weather data from API');
-        
+
         // Add location info to the response
         weatherData?['location'] = _getLocationName(lat, lon);
         weatherData?['coordinates'] = {'lat': lat, 'lon': lon};
@@ -167,23 +182,27 @@ class WeatherService {
     return weatherData;
   }
 
-  Future<void> _cacheWeatherData(Map<String, dynamic> data, double lat, double lon) async {
+  Future<void> _cacheWeatherData(
+    Map<String, dynamic> data,
+    double lat,
+    double lon,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
-      
+
       // Store in persistent storage
       await prefs.setString(_weatherDataKey, json.encode(data));
       await prefs.setInt(_cacheTimestampKey, now.millisecondsSinceEpoch);
       await prefs.setDouble(_cachedLatKey, lat);
       await prefs.setDouble(_cachedLonKey, lon);
-      
+
       // Update in-memory cache
       _memoryCache = data;
       _memoryCacheTimestamp = now;
       _memoryCacheLat = lat;
       _memoryCacheLon = lon;
-      
+
       print('Weather data cached successfully');
     } catch (e) {
       print('Error caching weather data: $e');
@@ -191,31 +210,45 @@ class WeatherService {
   }
 
   bool _isMemoryCacheValid(double lat, double lon) {
-    if (_memoryCache == null || 
-        _memoryCacheTimestamp == null || 
-        _memoryCacheLat == null || 
+    if (_memoryCache == null ||
+        _memoryCacheTimestamp == null ||
+        _memoryCacheLat == null ||
         _memoryCacheLon == null) {
       return false;
     }
-    
+
     final now = DateTime.now();
     final timeDifference = now.difference(_memoryCacheTimestamp!);
-    final locationDifference = _calculateDistance(lat, lon, _memoryCacheLat!, _memoryCacheLon!);
-    
-    return timeDifference.inHours < cacheExpiryHours && locationDifference < 1.0;
+    final locationDifference = _calculateDistance(
+      lat,
+      lon,
+      _memoryCacheLat!,
+      _memoryCacheLon!,
+    );
+
+    return timeDifference.inHours < cacheExpiryHours &&
+        locationDifference < 1.0;
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     // Simple distance calculation using Haversine formula
     const double earthRadius = 6371; // km
-    
+
     double dLat = _degreesToRadians(lat2 - lat1);
     double dLon = _degreesToRadians(lon2 - lon1);
-    
-    double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degreesToRadians(lat1)) * math.cos(_degreesToRadians(lat2)) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
-    
+
+    double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
     double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
@@ -227,11 +260,11 @@ class WeatherService {
   Map<String, dynamic> _getDummyData(double lat, double lon) {
     // Generate location name based on coordinates
     String locationName = _getLocationName(lat, lon);
-    
+
     // Generate dummy forecast data (next 24 hours in 3-hour intervals)
     List<Map<String, dynamic>> dummyForecast = [];
     DateTime now = DateTime.now();
-    
+
     for (int i = 0; i < 8; i++) {
       DateTime forecastTime = now.add(Duration(hours: i * 3));
       dummyForecast.add({
@@ -239,10 +272,13 @@ class WeatherService {
         'temp': (18 + (lat.abs() % 10) + (i % 5)).toDouble(),
         'humidity': (45 + (lon.abs() % 25) + (i % 15)).round(),
         'description': _getWeatherDescription(lat + i),
-        'rain': (i % 3 == 0) ? (math.Random().nextDouble() * 2).toStringAsFixed(1) : '0'
+        'rain':
+            (i % 3 == 0)
+                ? (math.Random().nextDouble() * 2).toStringAsFixed(1)
+                : '0',
       });
     }
-    
+
     return {
       'location': locationName,
       'coordinates': {'lat': lat, 'lon': lon},
@@ -252,10 +288,10 @@ class WeatherService {
         'description': _getWeatherDescription(lat),
         'wind_speed': (2 + (lat.abs() % 5)).toDouble(),
         'pressure': (1010 + (lat.abs() % 20)).round(),
-        'feels_like': (22 + (lat.abs() % 12)).toDouble()
+        'feels_like': (22 + (lat.abs() % 12)).toDouble(),
       },
       'forecast': dummyForecast,
-      'error': 'Using demo data - API unavailable'
+      'error': 'Using demo data - API unavailable',
     };
   }
 
@@ -292,16 +328,16 @@ class WeatherService {
 
   String _getWeatherDescription(double lat) {
     final descriptions = [
-      'clear sky', 
-      'few clouds', 
-      'scattered clouds', 
+      'clear sky',
+      'few clouds',
+      'scattered clouds',
       'broken clouds',
       'shower rain',
       'rain',
       'thunderstorm',
       'snow',
       'mist',
-      'overcast clouds'
+      'overcast clouds',
     ];
     return descriptions[(lat.abs() % descriptions.length).floor()];
   }
@@ -309,19 +345,19 @@ class WeatherService {
   Future<void> clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Clear persistent cache
       await prefs.remove(_weatherDataKey);
       await prefs.remove(_cacheTimestampKey);
       await prefs.remove(_cachedLatKey);
       await prefs.remove(_cachedLonKey);
-      
+
       // Clear in-memory cache
       _memoryCache = null;
       _memoryCacheTimestamp = null;
       _memoryCacheLat = null;
       _memoryCacheLon = null;
-      
+
       print('Cache cleared successfully');
     } catch (e) {
       print('Error clearing cache: $e');
@@ -333,12 +369,12 @@ class WeatherService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cacheTimestamp = prefs.getInt(_cacheTimestampKey);
-      
+
       if (cacheTimestamp != null) {
         final cacheTime = DateTime.fromMillisecondsSinceEpoch(cacheTimestamp);
         final now = DateTime.now();
         final ageInMinutes = now.difference(cacheTime).inMinutes;
-        
+
         return {
           'hasCachedData': true,
           'cacheAge': ageInMinutes,
@@ -349,7 +385,7 @@ class WeatherService {
     } catch (e) {
       print('Error getting cache info: $e');
     }
-    
+
     return {
       'hasCachedData': false,
       'cacheAge': 0,

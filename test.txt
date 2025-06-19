@@ -284,7 +284,7 @@ ${info.replaceAll('. ', '.\n\n')}
     try {
       final res = await http
           .post(
-            Uri.parse("http://10.0.2.2:5000/chat"),
+            Uri.parse("https://agrihive-server91.onrender.com/chat"),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({"message": message.text}),
           )
@@ -381,7 +381,7 @@ ${info.replaceAll('. ', '.\n\n')}
 
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse("http://10.0.2.2:5000/analyze_image"),
+        Uri.parse("https://agrihive-server91.onrender.com/analyze_image"),
       );
 
       request.headers.addAll({'Accept': 'application/json'});
