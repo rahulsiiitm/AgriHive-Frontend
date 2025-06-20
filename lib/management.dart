@@ -33,7 +33,7 @@ class Crop {
 class CropCache {
   static final Map<String, List<Crop>> _cache = {};
   static final Map<String, DateTime> _lastFetch = {};
-  static const Duration _cacheExpiry = Duration(minutes: 5);
+  static const Duration _cacheExpiry = Duration(minutes: 15);
 
   static bool isCacheValid(String userId) {
     final lastFetch = _lastFetch[userId];

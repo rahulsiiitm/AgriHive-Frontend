@@ -902,8 +902,8 @@ ${info.replaceAll('. ', '.\n\n')}
                     ],
                   ),
                   messageOptions: MessageOptions(
-                    currentUserContainerColor: Color.fromRGBO(67, 160, 71, 0.9),
-                    containerColor: Color.fromRGBO(255, 255, 255, 0.95),
+                    currentUserContainerColor: Color.fromARGB(227, 67, 160, 71),
+                    containerColor: Color.fromARGB(241, 255, 255, 255),
                     textColor: Colors.grey.shade800,
                     currentUserTextColor: Colors.white,
                     messagePadding: const EdgeInsets.all(16),
