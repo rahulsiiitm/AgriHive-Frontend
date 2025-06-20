@@ -1,240 +1,291 @@
 import 'package:flutter/material.dart';
 
-class UserProfilePage extends StatelessWidget {
-  const UserProfilePage({super.key});
+class ProfilePage extends StatefulWidget {
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  bool _notificationsEnabled = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FFF5),
-      body: Column(
-        children: [
-          _buildTopBanner(context),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text('Profile', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green[700],
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Profile Header
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.green[700],
+              ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 30),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 50, color: Colors.green[700]),
+                    ),
+                    SizedBox(height: 15),
+                    Text(
+                      'John Farmer',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.location_on, color: Colors.white70, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Maharashtra, India',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            SizedBox(height: 20),
+
+            // Menu Items
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildUserInfoCard(),
-                  const SizedBox(height: 20),
-                  _buildSectionTitle("Profile Details"),
-                  _buildInfoTile("📍 Region", "Imphal, Manipur"),
-                  _buildInfoTile("🌿 Crops", "Paddy, Tomato, Maize, Wheat"),
-                  _buildInfoTile("⭐ Plan", "Premium"),
-                  _buildInfoTile("🔔 Alerts", "Disease, Fertilizer, Weather"),
-                  _buildInfoTile("🌐 Language", "Hindi"),
-                  const SizedBox(height: 25),
-                  _buildSectionTitle("Preferences"),
-                  _buildToggleTile("Receive Alerts", true),
-                  _buildToggleTile("Show Weather Tips", true),
-                  _buildToggleTile("Auto Crop Suggestions", false),
-                  const SizedBox(height: 25),
-                  _buildSectionTitle("Quick Actions"),
-                  _buildActionButtons(),
-                  const SizedBox(height: 25),
-                  _buildSectionTitle("Progress"),
-                  _buildProgressCard(),
-                  const SizedBox(height: 40),
+                  _buildMenuItem(Icons.person_outline, 'Edit Profile', () {
+                    _showEditProfileDialog();
+                  }),
+                  
+                  _buildMenuItem(Icons.notifications_outlined, 'Notifications', () {
+                    _showNotificationSettings();
+                  }),
+                  
+                  _buildMenuItem(Icons.language, 'Language', () {
+                    _showLanguageDialog();
+                  }),
+                  
+                  _buildMenuItem(Icons.help_outline, 'Help & Support', () {}),
+                  
+                  _buildMenuItem(Icons.info_outline, 'About', () {}),
+                  
+                  SizedBox(height: 20),
+                  
+                  _buildMenuItem(Icons.logout, 'Logout', () {
+                    _showLogoutDialog();
+                  }, isDestructive: true),
                 ],
               ),
             ),
-          ),
-        ],
+
+            SizedBox(height: 30),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTopBanner(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/image1.jpg'),
-              fit: BoxFit.cover,
-            ),
+  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 5,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isDestructive ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: isDestructive ? Colors.red[600] : Colors.green[600],
+            size: 20,
           ),
         ),
-        Positioned(
-          bottom: -40,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.white,
-              child: const CircleAvatar(
-                radius: 46,
-                backgroundImage: AssetImage('assets/images/app_icon.png'),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUserInfoCard() {
-    return Column(
-      children: const [
-        SizedBox(height: 50),
-        Text(
-          "Rahul Sharma",
+        title: Text(
+          title,
           style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2E7D32),
+            fontWeight: FontWeight.w600,
+            color: isDestructive ? Colors.red[600] : Colors.grey[800],
           ),
         ),
-        SizedBox(height: 4),
-        Text(
-          "rahul.farmer@gmail.com",
-          style: TextStyle(fontSize: 14, color: Colors.black54),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey[400],
         ),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF388E3C),
-        ),
+        onTap: onTap,
       ),
     );
   }
 
-  Widget _buildInfoTile(String title, String subtitle) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.shade100,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              subtitle,
-              textAlign: TextAlign.right,
-              style: const TextStyle(color: Colors.black87),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleTile(String title, bool enabled) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.shade100,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-          Switch(
-            value: enabled,
-            onChanged: (_) {},
-            activeColor: const Color(0xFF66BB6A),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF66BB6A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+  void _showEditProfileDialog() {
+    TextEditingController nameController = TextEditingController(text: 'John Farmer');
+    TextEditingController locationController = TextEditingController(text: 'Maharashtra, India');
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Edit Profile'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            child: const Text("Edit Profile"),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD84315),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+              SizedBox(height: 16),
+              TextField(
+                controller: locationController,
+                decoration: InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            child: const Text("Logout"),
+            ],
           ),
-        ),
-      ],
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Save'),
+              onPressed: () {
+                // Save profile changes
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Profile updated successfully!')),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildProgressCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.shade100,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+  void _showNotificationSettings() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Notifications'),
+              content: SwitchListTile(
+                title: Text('Push Notifications'),
+                subtitle: Text('Receive weather alerts and crop advisories'),
+                value: _notificationsEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _notificationsEnabled = value;
+                  });
+                },
+              ),
+              actions: [
+                TextButton(
+                  child: Text('Done'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showLanguageDialog() {
+    List<String> languages = ['English', 'Hindi', 'Marathi', 'Gujarati', 'Tamil'];
+    String selectedLanguage = 'English';
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select Language'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: languages.map((language) {
+              return RadioListTile<String>(
+                title: Text(language),
+                value: language,
+                groupValue: selectedLanguage,
+                onChanged: (value) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Language changed to $value')),
+                  );
+                },
+              );
+            }).toList(),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("🧑‍🌾 Profile Completion", style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          LinearProgressIndicator(
-            value: 0.75,
-            backgroundColor: Colors.grey[200],
-            color: const Color(0xFF66BB6A),
-            minHeight: 8,
-          ),
-          const SizedBox(height: 8),
-          const Text("75% complete", style: TextStyle(color: Colors.black54)),
-        ],
-      ),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Logout'),
+          content: Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Logout', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Implement logout logic here
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Logged out successfully')),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

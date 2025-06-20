@@ -1,7 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
-
 import 'dart:ui';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -33,12 +30,41 @@ class Crop {
   }
 }
 
+class CropCache {
+  static final Map<String, List<Crop>> _cache = {};
+  static final Map<String, DateTime> _lastFetch = {};
+  static const Duration _cacheExpiry = Duration(minutes: 5);
+
+  static bool isCacheValid(String userId) {
+    final lastFetch = _lastFetch[userId];
+    if (lastFetch == null) return false;
+    return DateTime.now().difference(lastFetch) < _cacheExpiry;
+  }
+
+  static List<Crop>? getCachedCrops(String userId) {
+    if (isCacheValid(userId)) {
+      return _cache[userId];
+    }
+    return null;
+  }
+
+  static void setCachedCrops(String userId, List<Crop> crops) {
+    _cache[userId] = crops;
+    _lastFetch[userId] = DateTime.now();
+  }
+
+  static void invalidateCache(String userId) {
+    _cache.remove(userId);
+    _lastFetch.remove(userId);
+  }
+}
+
 class PlantationManagementPage extends StatefulWidget {
-  final String userId; // Add userId parameter
+  final String userId;
 
   const PlantationManagementPage({
     super.key,
-    required this.userId, // Make userId required
+    required this.userId,
   });
 
   @override
@@ -51,13 +77,27 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
   bool isLoading = true;
   String errorMessage = '';
 
-  // Use the userId from widget parameter
   String get userId => widget.userId;
 
   @override
   void initState() {
     super.initState();
-    fetchCrops();
+    loadCrops();
+  }
+
+  Future<void> loadCrops() async {
+    // Try cache first
+    final cachedCrops = CropCache.getCachedCrops(userId);
+    if (cachedCrops != null) {
+      setState(() {
+        crops = cachedCrops;
+        isLoading = false;
+      });
+      return;
+    }
+
+    // Fetch from API if cache miss
+    await fetchCrops();
   }
 
   Future<void> fetchCrops() async {
@@ -67,11 +107,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         errorMessage = '';
       });
 
-      // Validate userId before making API call
-      if (userId.isEmpty ||
-          userId == '0' ||
-          userId == 'null' ||
-          userId == 'undefined') {
+      if (userId.isEmpty || userId == '0' || userId == 'null' || userId == 'undefined') {
         setState(() {
           errorMessage = 'Invalid user ID';
           isLoading = false;
@@ -80,33 +116,32 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       }
 
       final response = await http.get(
-        Uri.parse(
-          'https://agrihive-server91.onrender.com/getCrops?userId=$userId',
-        ),
+        Uri.parse('https://agrihive-server91.onrender.com/getCrops?userId=$userId'),
         headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
 
-        // Handle both success cases: with crops and empty crops
         if (responseData.containsKey('crops')) {
-          final List<dynamic> cropsData =
-              responseData['crops'] as List<dynamic>;
-
+          final List<dynamic> cropsData = responseData['crops'] as List<dynamic>;
+          final cropsList = cropsData.map((json) => Crop.fromJson(json)).toList();
+          
+          // Cache the results
+          CropCache.setCachedCrops(userId, cropsList);
+          
           setState(() {
-            crops = cropsData.map((json) => Crop.fromJson(json)).toList();
+            crops = cropsList;
             isLoading = false;
           });
         } else {
-          // Handle case where API returns different structure
           setState(() {
             crops = [];
             isLoading = false;
           });
+          CropCache.setCachedCrops(userId, []);
         }
       } else if (response.statusCode == 400) {
-        // Handle bad request (invalid user ID)
         final Map<String, dynamic> errorData = json.decode(response.body);
         setState(() {
           errorMessage = errorData['error'] ?? 'Invalid request';
@@ -125,16 +160,12 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       });
       if (kDebugMode) {
         print('Error fetching crops: $e');
-      } // For debugging
+      }
     }
   }
 
-  Future<bool> addCropsToDatabase(
-    String userId,
-    List<Map<String, dynamic>> cropData,
-  ) async {
-    const String apiUrl =
-        "https://agrihive-server91.onrender.com/addCrop"; // change to your actual URL
+  Future<bool> addCropsToDatabase(String userId, List<Map<String, dynamic>> cropData) async {
+    const String apiUrl = "https://agrihive-server91.onrender.com/addCrop";
 
     try {
       final response = await http.post(
@@ -145,10 +176,14 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
 
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
-        return responseBody["message"]?.toString().toLowerCase().contains(
-              "success",
-            ) ??
-            false;
+        final success = responseBody["message"]?.toString().toLowerCase().contains("success") ?? false;
+        
+        if (success) {
+          // Invalidate cache on successful add
+          CropCache.invalidateCache(userId);
+        }
+        
+        return success;
       } else {
         if (kDebugMode) {
           print("Server error: ${response.statusCode}");
@@ -158,6 +193,66 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     } catch (e) {
       if (kDebugMode) {
         print("Error occurred: $e");
+      }
+      return false;
+    }
+  }
+
+  Future<bool> deleteCropFromDatabase(String userId, String cropId) async {
+    final url = Uri.parse('https://agrihive-server91.onrender.com/deleteCrop');
+
+    try {
+      final response = await http.delete(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': userId, 'cropId': cropId}),
+      );
+
+      if (response.statusCode == 200) {
+        // Invalidate cache on successful delete
+        CropCache.invalidateCache(userId);
+        return true;
+      } else {
+        if (kDebugMode) {
+          print('Failed to delete: ${response.body}');
+        }
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting crop: $e');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> updateCropInDatabase(String userId, String cropId, Map<String, dynamic> cropData) async {
+    final url = Uri.parse('https://agrihive-server91.onrender.com/updateCrop');
+
+    try {
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'cropId': cropId,
+          'cropData': cropData,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Invalidate cache on successful update
+        CropCache.invalidateCache(userId);
+        return true;
+      } else {
+        if (kDebugMode) {
+          print('Failed to update: ${response.body}');
+        }
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating crop: $e');
       }
       return false;
     }
@@ -182,35 +277,20 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Add Crop',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('Add Crop', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       SizedBox(height: 16),
-                      TextField(
-                        controller: nameController,
-                        decoration: InputDecoration(labelText: 'Crop Name'),
-                      ),
+                      TextField(controller: nameController, decoration: InputDecoration(labelText: 'Crop Name')),
                       SizedBox(height: 12),
                       TextField(
                         controller: areaController,
-                        decoration: InputDecoration(
-                          labelText: 'Area (in acres)',
-                        ),
+                        decoration: InputDecoration(labelText: 'Area (in acres)'),
                         keyboardType: TextInputType.number,
                       ),
                       SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            selectedDate == null
-                                ? 'Select Date'
-                                : '${selectedDate!.toLocal()}'.split(' ')[0],
-                          ),
+                          Text(selectedDate == null ? 'Select Date' : '${selectedDate!.toLocal()}'.split(' ')[0]),
                           TextButton(
                             onPressed: () async {
                               DateTime? picked = await showDatePicker(
@@ -234,8 +314,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                         onPressed: () async {
                           final String name = nameController.text.trim();
                           final String area = areaController.text.trim();
-                          final String? date =
-                              selectedDate?.toIso8601String().split("T").first;
+                          final String? date = selectedDate?.toIso8601String().split("T").first;
 
                           if (name.isEmpty || area.isEmpty || date == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -250,17 +329,14 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                             "plantedDate": date,
                           };
 
-                          bool success = await addCropsToDatabase(userId, [
-                            crop,
-                          ]);
+                          bool success = await addCropsToDatabase(userId, [crop]);
                           if (success) {
-                            Navigator.of(context).pop(); // close dialog
+                            Navigator.of(context).pop();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Crop added successfully!'),
-                              ),
+                              SnackBar(content: Text('Crop added successfully!')),
                             );
-                            fetchCrops();
+                            // Refresh from cache (which was invalidated)
+                            await loadCrops();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Failed to add crop.')),
@@ -285,164 +361,87 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     );
   }
 
-  Future<bool> deleteCropFromDatabase(String userId, String cropId) async {
-    final url = Uri.parse(
-      'https://agrihive-server91.onrender.com/deleteCrop',
-    ); // replace with your endpoint
-
-    try {
-      final response = await http.delete(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId, 'cropId': cropId}),
-      );
-
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        if (kDebugMode) {
-          print('Failed to delete: ${response.body}');
-        }
-        return false;
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error deleting crop: $e');
-      }
-      return false;
-    }
-  }
-
-  Future<bool> updateCropInDatabase(
-    String userId,
-    String cropId,
-    Map<String, dynamic> cropData,
-  ) async {
-    final url = Uri.parse(
-      'https://agrihive-server91.onrender.com/updateCrop',
-    ); // use your correct API
-
-    try {
-      final response = await http.put(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'userId': userId, // ✅ required for get_or_create_user_id
-          'cropId': cropId, // ✅ cropId required
-          'cropData': cropData, // ✅ actual data to update
-        }),
-      );
-
-      if (kDebugMode) {
-        print('Status: ${response.statusCode}');
-      }
-      if (kDebugMode) {
-        print('Body: ${response.body}');
-      }
-
-      return response.statusCode == 200;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error updating crop: $e');
-      }
-      return false;
-    }
-  }
-
   void showUpdateDialog(BuildContext context, String userId, Map crop) {
     final nameController = TextEditingController(text: crop['name']);
-    final areaController = TextEditingController(
-      text: crop['area']?.toString(),
-    );
+    final areaController = TextEditingController(text: crop['area']?.toString());
     DateTime? selectedDate = DateTime.tryParse(crop['plantedDate'] ?? '');
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Update Crop'),
-            content: StatefulBuilder(
-              builder: (context, setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
+      builder: (context) => AlertDialog(
+        title: Text('Update Crop'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: InputDecoration(labelText: 'Crop Name')),
+                TextField(
+                  controller: areaController,
+                  decoration: InputDecoration(labelText: 'Area (in acres)'),
+                  keyboardType: TextInputType.number,
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(labelText: 'Crop Name'),
-                    ),
-                    TextField(
-                      controller: areaController,
-                      decoration: InputDecoration(labelText: 'Area (in acres)'),
-                      keyboardType: TextInputType.number,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          selectedDate == null
-                              ? 'Select Date'
-                              : selectedDate!.toIso8601String().split('T')[0],
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            DateTime? picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDate ?? DateTime.now(),
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                selectedDate = picked;
-                              });
-                            }
-                          },
-                          child: Text('Pick Date'),
-                        ),
-                      ],
+                    Text(selectedDate == null ? 'Select Date' : selectedDate!.toIso8601String().split('T')[0]),
+                    TextButton(
+                      onPressed: () async {
+                        DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      child: Text('Pick Date'),
                     ),
                   ],
-                );
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  final area = int.tryParse(areaController.text.trim()) ?? 0;
-                  final date = selectedDate?.toIso8601String().split('T').first;
-
-                  final updatedData = {
-                    'name': name,
-                    'area': area,
-                    'plantedDate': date,
-                  };
-
-                  final success = await updateCropInDatabase(
-                    userId,
-                    crop['id'],
-                    updatedData,
-                  );
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success
-                            ? 'Crop updated successfully'
-                            : 'Failed to update crop',
-                      ),
-                    ),
-                  );
-                },
-                child: Text('Update'),
-              ),
-            ],
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
           ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final area = int.tryParse(areaController.text.trim()) ?? 0;
+              final date = selectedDate?.toIso8601String().split('T').first;
+
+              final updatedData = {
+                'name': name,
+                'area': area,
+                'plantedDate': date,
+              };
+
+              final success = await updateCropInDatabase(userId, crop['id'], updatedData);
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(success ? 'Crop updated successfully' : 'Failed to update crop'),
+                ),
+              );
+
+              if (success) {
+                // Refresh from cache (which was invalidated)
+                await loadCrops();
+              }
+            },
+            child: Text('Update'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -897,3 +896,5 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     );
   }
 }
+
+ 

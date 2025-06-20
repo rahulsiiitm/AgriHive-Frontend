@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/home.dart';
+import 'package:my_app/profile_page.dart';
 
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -20,10 +21,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'AgriHive App',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-        fontFamily: 'lufga',
-      ),
+      theme: ThemeData(primarySwatch: Colors.green, fontFamily: 'lufga'),
       home: AuthWrapper(),
     );
   }
@@ -84,12 +82,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
     Icons.person,
   ];
 
-  final List<String> _labels = [
-    'Home',
-    'Manage',
-    'IoT',
-    'Profile',
-  ];
+  final List<String> _labels = ['Home', 'Manage', 'IoT', 'Profile'];
 
   void _onItemTapped(int index) {
     if (index == 2) return;
@@ -114,7 +107,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
         margin: const EdgeInsets.only(bottom: 15),
         child: FloatingActionButton(
           onPressed: _onFabPressed,
-          backgroundColor: Color(0xFFFF4B9834),
+          backgroundColor: Color(0xFF4B9834),
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
@@ -131,7 +124,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
         child: BottomAppBar(
           shape: const CircularNotchedRectangle(),
           notchMargin: 10.0,
-          color: Color(0xFF1B4332),
+          color: Color.fromARGB(237, 27, 67, 50),
           elevation: 10,
           child: SizedBox(
             height: 70,
@@ -148,9 +141,10 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                     children: [
                       Icon(
                         _icons[adjustedIndex],
-                        color: _selectedIndex == index
-                            ? Color.fromARGB(255, 120, 255, 165)
-                            : Color(0xFFFFFFFF),
+                        color:
+                            _selectedIndex == index
+                                ? Color.fromARGB(255, 120, 255, 165)
+                                : Color(0xFFFFFFFF),
                       ),
                       SizedBox(height: 4),
                       Text(
@@ -158,11 +152,12 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                         style: TextStyle(
                           fontFamily: 'lufga',
                           fontSize: 12,
-                          color: _selectedIndex == index
-                            ? Color(0xFF4B9834)
-                            : Color(0xFFA0A0A0),
+                          color:
+                              _selectedIndex == index
+                                  ? Color(0xFF4B9834)
+                                  : Color(0xFFA0A0A0),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 );
@@ -176,10 +171,10 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
 }
 
 // Dummy Pages (same as before)
-class ProfilePage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Center(child: Text('Profile Page'));
-}
+// class ProfilePage extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) => Center(child: Text('Profile Page'));
+// }
 
 class IoTPage extends StatelessWidget {
   @override
