@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:my_app/main.dart';
 import 'package:my_app/services/auth_service.dart';
 import 'signup_screen.dart';
 
@@ -28,10 +30,19 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        await _authService.signInWithEmailAndPassword(
+        User? user = await _authService.signInWithEmailAndPassword(
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
+
+        if (user != null) {
+          // Successfully signed in, navigate to main screen
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => MyApp()), // Replace MainScreen() with your actual main screen
+            (route) => false,
+          );
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_authService.getErrorMessage(e))),

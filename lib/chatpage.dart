@@ -64,7 +64,7 @@ class _ChatPageState extends State<ChatPage> {
 
     try {
       final cacheTimestamp =
-          _prefs!.getInt('${_cacheTimestampKey}${widget.userId}') ?? 0;
+          _prefs!.getInt('$_cacheTimestampKey${widget.userId}') ?? 0;
       final isExpired =
           DateTime.now().difference(
             DateTime.fromMillisecondsSinceEpoch(cacheTimestamp),
@@ -77,12 +77,12 @@ class _ChatPageState extends State<ChatPage> {
       }
 
       // Load current chat ID
-      currentChatId = _prefs!.getString('${_currentChatIdKey}${widget.userId}');
+      currentChatId = _prefs!.getString('$_currentChatIdKey${widget.userId}');
 
       // Load only current chat messages
       if (currentChatId != null) {
         final cachedMessagesJson = _prefs!.getString(
-          '${_currentChatMessagesKey}${widget.userId}_$currentChatId',
+          '$_currentChatMessagesKey${widget.userId}_$currentChatId',
         );
         if (cachedMessagesJson != null) {
           final messagesList = json.decode(cachedMessagesJson) as List;
@@ -109,15 +109,15 @@ class _ChatPageState extends State<ChatPage> {
       final messagesJson =
           messages.map((msg) => _serializeChatMessage(msg)).toList();
       await _prefs!.setString(
-        '${_currentChatMessagesKey}${widget.userId}_$currentChatId',
+        '$_currentChatMessagesKey${widget.userId}_$currentChatId',
         json.encode(messagesJson),
       );
       await _prefs!.setString(
-        '${_currentChatIdKey}${widget.userId}',
+        '$_currentChatIdKey${widget.userId}',
         currentChatId!,
       );
       await _prefs!.setInt(
-        '${_cacheTimestampKey}${widget.userId}',
+        '$_cacheTimestampKey${widget.userId}',
         DateTime.now().millisecondsSinceEpoch,
       );
     } catch (e) {
@@ -131,11 +131,11 @@ class _ChatPageState extends State<ChatPage> {
     // Clear current chat cache
     if (currentChatId != null) {
       await _prefs!.remove(
-        '${_currentChatMessagesKey}${widget.userId}_$currentChatId',
+        '$_currentChatMessagesKey${widget.userId}_$currentChatId',
       );
     }
-    await _prefs!.remove('${_currentChatIdKey}${widget.userId}');
-    await _prefs!.remove('${_cacheTimestampKey}${widget.userId}');
+    await _prefs!.remove('$_currentChatIdKey${widget.userId}');
+    await _prefs!.remove('$_cacheTimestampKey${widget.userId}');
   }
 
   // Load specific chat from backend
@@ -750,7 +750,7 @@ ${info.replaceAll('. ', '.\n\n')}
           backgroundColor: Colors.green.shade600,
           foregroundColor: Colors.white,
           elevation: 2,
-          shadowColor: Color.fromRGBO(0, 128, 0, 0.3),
+          shadowColor: Color(0xFF008000).withOpacity(0.3),
           actions: [
             IconButton(
               icon: const Icon(Icons.add),
@@ -840,7 +840,7 @@ ${info.replaceAll('. ', '.\n\n')}
                         ),
                       ),
                       filled: true,
-                      fillColor: Color.fromRGBO(255, 255, 255, 0.90),
+                      fillColor: Color.fromRGBO(255, 255, 255, 0.80),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 12,
@@ -903,7 +903,7 @@ ${info.replaceAll('. ', '.\n\n')}
                   ),
                   messageOptions: MessageOptions(
                     currentUserContainerColor: Color.fromARGB(227, 67, 160, 71),
-                    containerColor: Color.fromARGB(241, 255, 255, 255),
+                    containerColor: Colors.white.withOpacity(0.80),
                     textColor: Colors.grey.shade800,
                     currentUserTextColor: Colors.white,
                     messagePadding: const EdgeInsets.all(16),

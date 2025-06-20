@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Crop {
   final String id;
@@ -28,34 +29,174 @@ class Crop {
       area: json['area'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'type': type,
+      'plantedDate': plantedDate,
+      'area': area,
+    };
+  }
 }
 
 class CropCache {
-  static final Map<String, List<Crop>> _cache = {};
-  static final Map<String, DateTime> _lastFetch = {};
-  static const Duration _cacheExpiry = Duration(minutes: 15);
+  static final Map<String, List<Crop>> _memoryCache = {};
+  static final Map<String, bool> _isLoaded = {};
+  static const String _storagePrefix = 'crops_cache_';
+  static const String _loadedPrefix = 'crops_loaded_';
+  static const String _timestampPrefix = 'crops_timestamp_';
 
-  static bool isCacheValid(String userId) {
-    final lastFetch = _lastFetch[userId];
-    if (lastFetch == null) return false;
-    return DateTime.now().difference(lastFetch) < _cacheExpiry;
-  }
+  // Initialize cache from persistent storage
+  static Future<void> initializeCache(String userId) async {
+    if (_isLoaded[userId] == true) return; // Already loaded
 
-  static List<Crop>? getCachedCrops(String userId) {
-    if (isCacheValid(userId)) {
-      return _cache[userId];
+    final prefs = await SharedPreferences.getInstance();
+    final cachedData = prefs.getString('$_storagePrefix$userId');
+    final isLoaded = prefs.getBool('$_loadedPrefix$userId') ?? false;
+
+    if (cachedData != null && isLoaded) {
+      try {
+        final List<dynamic> jsonList = json.decode(cachedData);
+        final crops = jsonList.map((json) => Crop.fromJson(json)).toList();
+        _memoryCache[userId] = crops;
+        _isLoaded[userId] = true;
+        
+        if (kDebugMode) {
+          final timestamp = prefs.getInt('$_timestampPrefix$userId') ?? 0;
+          final lastSaved = DateTime.fromMillisecondsSinceEpoch(timestamp);
+          print('Cache loaded from storage. Last saved: $lastSaved');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error loading cache from storage: $e');
+        }
+        // Clear corrupted data
+        await clearPersistentCache(userId);
+      }
     }
-    return null;
   }
 
-  static void setCachedCrops(String userId, List<Crop> crops) {
-    _cache[userId] = crops;
-    _lastFetch[userId] = DateTime.now();
+  // Check if data is already loaded
+  static bool isDataLoaded(String userId) {
+    return _isLoaded[userId] == true && _memoryCache.containsKey(userId);
   }
 
-  static void invalidateCache(String userId) {
-    _cache.remove(userId);
-    _lastFetch.remove(userId);
+  // Get cached crops (from memory first, then try loading from storage)
+  static Future<List<Crop>?> getCachedCrops(String userId) async {
+    // Try memory cache first
+    if (isDataLoaded(userId)) {
+      return _memoryCache[userId];
+    }
+
+    // Try loading from persistent storage
+    await initializeCache(userId);
+    return _memoryCache[userId];
+  }
+
+  // Set cached crops and save to persistent storage
+  static Future<void> setCachedCrops(String userId, List<Crop> crops) async {
+    _memoryCache[userId] = crops;
+    _isLoaded[userId] = true;
+    
+    // Save to persistent storage
+    await _saveToPersistentStorage(userId, crops);
+  }
+
+  // Save to SharedPreferences
+  static Future<void> _saveToPersistentStorage(String userId, List<Crop> crops) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = json.encode(crops.map((crop) => crop.toJson()).toList());
+      
+      await prefs.setString('$_storagePrefix$userId', jsonString);
+      await prefs.setBool('$_loadedPrefix$userId', true);
+      await prefs.setInt('$_timestampPrefix$userId', DateTime.now().millisecondsSinceEpoch);
+      
+      if (kDebugMode) {
+        print('Cache saved to persistent storage for user: $userId');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving to persistent storage: $e');
+      }
+    }
+  }
+
+  // Clear all cache (memory + storage)
+  static Future<void> clearAllCache(String userId) async {
+    _memoryCache.remove(userId);
+    _isLoaded.remove(userId);
+    await clearPersistentCache(userId);
+  }
+
+  // Clear only persistent storage
+  static Future<void> clearPersistentCache(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_storagePrefix$userId');
+      await prefs.remove('$_loadedPrefix$userId');
+      await prefs.remove('$_timestampPrefix$userId');
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error clearing persistent cache: $e');
+      }
+    }
+  }
+
+  // Force refresh - clears all cache and forces reload
+  static Future<void> forceRefresh(String userId) async {
+    await clearAllCache(userId);
+  }
+
+  // Add crop to cache (memory + storage)
+  static Future<void> addCropToCache(String userId, Crop crop) async {
+    if (isDataLoaded(userId)) {
+      _memoryCache[userId]?.add(crop);
+      await _saveToPersistentStorage(userId, _memoryCache[userId]!);
+    }
+  }
+
+  // Remove crop from cache (memory + storage)
+  static Future<void> removeCropFromCache(String userId, String cropId) async {
+    if (isDataLoaded(userId)) {
+      _memoryCache[userId]?.removeWhere((crop) => crop.id == cropId);
+      if (_memoryCache[userId] != null) {
+        await _saveToPersistentStorage(userId, _memoryCache[userId]!);
+      }
+    }
+  }
+
+  // Update specific crop in cache (memory + storage)
+  static Future<void> updateCropInCache(String userId, String cropId, Crop updatedCrop) async {
+    if (isDataLoaded(userId)) {
+      final crops = _memoryCache[userId];
+      if (crops != null) {
+        final index = crops.indexWhere((crop) => crop.id == cropId);
+        if (index != -1) {
+          crops[index] = updatedCrop;
+          await _saveToPersistentStorage(userId, crops);
+        }
+      }
+    }
+  }
+
+  // Get cache info for debugging
+  static Future<Map<String, dynamic>> getCacheInfo(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final timestamp = prefs.getInt('$_timestampPrefix$userId') ?? 0;
+    final isLoaded = prefs.getBool('$_loadedPrefix$userId') ?? false;
+    final hasMemoryCache = _memoryCache.containsKey(userId);
+    final cropCount = _memoryCache[userId]?.length ?? 0;
+
+    return {
+      'isLoaded': isLoaded,
+      'hasMemoryCache': hasMemoryCache,
+      'cropCount': cropCount,
+      'lastSaved': timestamp > 0 ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null,
+      'cacheSize': prefs.getString('$_storagePrefix$userId')?.length ?? 0,
+    };
   }
 }
 
@@ -74,8 +215,9 @@ class PlantationManagementPage extends StatefulWidget {
 
 class _PlantationManagementPageState extends State<PlantationManagementPage> {
   List<Crop> crops = [];
-  bool isLoading = true;
+  bool isLoading = false;
   String errorMessage = '';
+  bool isOnline = true;
 
   String get userId => widget.userId;
 
@@ -86,17 +228,30 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
   }
 
   Future<void> loadCrops() async {
-    // Try cache first
-    final cachedCrops = CropCache.getCachedCrops(userId);
-    if (cachedCrops != null) {
+    // Initialize cache first (loads from persistent storage if available)
+    await CropCache.initializeCache(userId);
+    
+    // Check if data is already available in cache
+    final cachedCrops = await CropCache.getCachedCrops(userId);
+    if (cachedCrops != null && cachedCrops.isNotEmpty) {
       setState(() {
         crops = cachedCrops;
         isLoading = false;
       });
+      
+      if (kDebugMode) {
+        print('Loaded ${cachedCrops.length} crops from cache');
+      }
       return;
     }
 
-    // Fetch from API if cache miss
+    // Only fetch from API if no cache available
+    await fetchCrops();
+  }
+
+  // Method to force refresh from API
+  Future<void> refreshCrops() async {
+    await CropCache.forceRefresh(userId);
     await fetchCrops();
   }
 
@@ -105,6 +260,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       setState(() {
         isLoading = true;
         errorMessage = '';
+        isOnline = true;
       });
 
       if (userId.isEmpty || userId == '0' || userId == 'null' || userId == 'undefined') {
@@ -118,7 +274,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       final response = await http.get(
         Uri.parse('https://agrihive-server91.onrender.com/getCrops?userId=$userId'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
@@ -127,19 +283,23 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           final List<dynamic> cropsData = responseData['crops'] as List<dynamic>;
           final cropsList = cropsData.map((json) => Crop.fromJson(json)).toList();
           
-          // Cache the results
-          CropCache.setCachedCrops(userId, cropsList);
+          // Cache the results with persistent storage
+          await CropCache.setCachedCrops(userId, cropsList);
           
           setState(() {
             crops = cropsList;
             isLoading = false;
           });
+          
+          if (kDebugMode) {
+            print('Fetched and cached ${cropsList.length} crops from API');
+          }
         } else {
           setState(() {
             crops = [];
             isLoading = false;
           });
-          CropCache.setCachedCrops(userId, []);
+          await CropCache.setCachedCrops(userId, []);
         }
       } else if (response.statusCode == 400) {
         final Map<String, dynamic> errorData = json.decode(response.body);
@@ -157,7 +317,22 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       setState(() {
         errorMessage = 'Network error: Unable to connect to server';
         isLoading = false;
+        isOnline = false;
       });
+      
+      // Try to load from cache when offline
+      final cachedCrops = await CropCache.getCachedCrops(userId);
+      if (cachedCrops != null && cachedCrops.isNotEmpty) {
+        setState(() {
+          crops = cachedCrops;
+          errorMessage = 'Showing cached data (Offline)';
+        });
+        
+        if (kDebugMode) {
+          print('Network error, loaded ${cachedCrops.length} crops from cache');
+        }
+      }
+      
       if (kDebugMode) {
         print('Error fetching crops: $e');
       }
@@ -172,15 +347,15 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         Uri.parse(apiUrl),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"userId": userId, "cropData": cropData}),
-      );
+      ).timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
         final success = responseBody["message"]?.toString().toLowerCase().contains("success") ?? false;
         
         if (success) {
-          // Invalidate cache on successful add
-          CropCache.invalidateCache(userId);
+          // Refresh data after successful add to get server-generated IDs
+          await refreshCrops();
         }
         
         return success;
@@ -206,11 +381,15 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'userId': userId, 'cropId': cropId}),
-      );
+      ).timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        // Invalidate cache on successful delete
-        CropCache.invalidateCache(userId);
+        // Remove from cache and update UI immediately
+        await CropCache.removeCropFromCache(userId, cropId);
+        final updatedCrops = await CropCache.getCachedCrops(userId) ?? [];
+        setState(() {
+          crops = updatedCrops;
+        });
         return true;
       } else {
         if (kDebugMode) {
@@ -238,11 +417,22 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           'cropId': cropId,
           'cropData': cropData,
         }),
-      );
+      ).timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        // Invalidate cache on successful update
-        CropCache.invalidateCache(userId);
+        // Update cache and UI immediately
+        final updatedCrop = Crop.fromJson({
+          'id': cropId,
+          ...cropData,
+        });
+        await CropCache.updateCropInCache(userId, cropId, updatedCrop);
+        
+        // Refresh UI with updated cache
+        final updatedCrops = await CropCache.getCachedCrops(userId) ?? [];
+        setState(() {
+          crops = updatedCrops;
+        });
+        
         return true;
       } else {
         if (kDebugMode) {
@@ -335,8 +525,6 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Crop added successfully!')),
                             );
-                            // Refresh from cache (which was invalidated)
-                            await loadCrops();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Failed to add crop.')),
@@ -360,6 +548,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
       },
     );
   }
+
+ 
 
   void showUpdateDialog(BuildContext context, String userId, Map crop) {
     final nameController = TextEditingController(text: crop['name']);

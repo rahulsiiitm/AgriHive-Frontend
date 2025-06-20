@@ -7,11 +7,11 @@ class WeatherCard extends StatefulWidget {
   final bool isLoading;
 
   const WeatherCard({
-    Key? key,
+    super.key,
     required this.weatherData,
     this.onRefresh,
     this.isLoading = false,
-  }) : super(key: key);
+  });
 
   @override
   State<WeatherCard> createState() => _WeatherCardState();
@@ -123,13 +123,14 @@ class _WeatherCardState extends State<WeatherCard>
   @override
   Widget build(BuildContext context) {
     if (widget.isLoading) return _buildLoadingCard();
-    if (widget.weatherData == null)
+    if (widget.weatherData == null) {
       return _buildErrorCard('No weather data available');
+    }
 
     final current = widget.weatherData!['current'] ?? {};
     final location = widget.weatherData!['location'] ?? 'Unknown Location';
     final coordinates = widget.weatherData!['coordinates'];
-    final forecast = widget.weatherData!['forecast'] as List<dynamic>? ?? [];
+    // final forecast = widget.weatherData!['forecast'] as List<dynamic>? ?? [];
     final error = widget.weatherData!['error'];
 
     return SlideTransition(
