@@ -324,18 +324,17 @@ class _GreetingWidget extends StatelessWidget {
             "Hello, $name",
             style: const TextStyle(
               fontFamily: 'lufga',
-              fontSize: 24,
+              fontSize: 18,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Text(
             formattedDate,
             style: const TextStyle(
               fontFamily: 'lufga',
-              fontSize: 14,
+              fontSize: 12,
               color: Colors.white70,
-              decoration: TextDecoration.underline,
             ),
           ),
         ],
@@ -381,7 +380,7 @@ class _BodyContentWidget extends StatelessWidget {
     return Positioned.fill(
       top: 100,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -390,7 +389,7 @@ class _BodyContentWidget extends StatelessWidget {
               isLoading: isLoading,
               onRefresh: onRefresh,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
 
             // Animated Container Cards
             FadeTransition(
@@ -439,7 +438,7 @@ class _BodyContentWidget extends StatelessWidget {
                         flex: 1,
                         child: Container(
                           height: 208,
-                          margin: const EdgeInsets.only(left: 8),
+                          margin: const EdgeInsets.only(left: 0),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(16),
@@ -453,7 +452,7 @@ class _BodyContentWidget extends StatelessWidget {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
 
                   // Bottom full-width container
                   Container(
@@ -471,6 +470,7 @@ class _BodyContentWidget extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 100),
           ],
         ),
       ),

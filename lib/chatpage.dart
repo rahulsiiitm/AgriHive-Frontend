@@ -734,13 +734,13 @@ ${info.replaceAll('. ', '.\n\n')}
                 style: TextStyle(
                   fontFamily: 'lufga',
                   fontWeight: FontWeight.w600,
-                  fontSize: 20,
+                  fontSize: 15,
                 ),
               ),
               const Text(
                 "Your Smart Farming Assistant",
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 8,
                   fontWeight: FontWeight.w300,
                   color: Colors.white70,
                 ),
@@ -818,6 +818,7 @@ ${info.replaceAll('. ', '.\n\n')}
                     inputDecoration: InputDecoration(
                       hintText: "Ask about agriculture...",
                       hintStyle: TextStyle(
+                        fontSize: 14,
                         fontFamily: 'lufga',
                         color: Colors.grey.shade500,
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'package:my_app/home.dart';
 import 'package:my_app/profile_page.dart';
 
@@ -18,6 +19,9 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+
+    //  WidgetsFlutterBinding.ensureInitialized();
+    // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     return MaterialApp(
       title: 'AgriHive App',
       debugShowCheckedModeBanner: false,
@@ -112,7 +116,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
-          child: Icon(Icons.eco, size: 35, color: Colors.white),
+          child: Icon(Icons.eco, size: 30, color: Colors.white),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
@@ -151,7 +155,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                         _labels[adjustedIndex],
                         style: TextStyle(
                           fontFamily: 'lufga',
-                          fontSize: 12,
+                          fontSize: 8,
                           color:
                               _selectedIndex == index
                                   ? Color(0xFF4B9834)

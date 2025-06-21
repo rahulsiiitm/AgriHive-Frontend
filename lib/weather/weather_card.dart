@@ -230,7 +230,7 @@ class _WeatherCardState extends State<WeatherCard>
                         Text(
                           location,
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -239,7 +239,7 @@ class _WeatherCardState extends State<WeatherCard>
                           Text(
                             '${coordinates['lat']?.toStringAsFixed(2)}, ${coordinates['lon']?.toStringAsFixed(2)}',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 9,
                               color: Colors.white70,
                             ),
                           ),
@@ -271,7 +271,7 @@ class _WeatherCardState extends State<WeatherCard>
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
         // Temperature and Icon Row
         Row(
@@ -295,7 +295,7 @@ class _WeatherCardState extends State<WeatherCard>
                             Text(
                               current['temperature']?.toString() ?? '--',
                               style: const TextStyle(
-                                fontSize: 40,
+                                fontSize: 35,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
@@ -303,7 +303,7 @@ class _WeatherCardState extends State<WeatherCard>
                             const Text(
                               '°C',
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: 15,
                                 color: Colors.white70,
                               ),
                             ),
@@ -313,7 +313,7 @@ class _WeatherCardState extends State<WeatherCard>
                           current['description']?.toString().toUpperCase() ??
                               'N/A',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: Colors.white,
                           ),
@@ -341,7 +341,7 @@ class _WeatherCardState extends State<WeatherCard>
                       ),
                       child: Text(
                         _getWeatherEmoji(current['description'] ?? ''),
-                        style: const TextStyle(fontSize: 36),
+                        style: const TextStyle(fontSize: 32),
                       ),
                     ),
                   );
@@ -350,7 +350,7 @@ class _WeatherCardState extends State<WeatherCard>
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Details Section
         TweenAnimationBuilder<double>(
@@ -394,7 +394,7 @@ class _WeatherCardState extends State<WeatherCard>
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 5),
                           Row(
                             children: [
                               Expanded(

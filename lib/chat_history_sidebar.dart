@@ -171,7 +171,7 @@ class ChatHistorySidebar extends StatelessWidget {
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontFamily: 'lufga',
-              fontSize: 16,
+              fontSize: 13,
             ),
           ),
           const Spacer(),
@@ -198,7 +198,7 @@ class ChatHistorySidebar extends StatelessWidget {
           children: [
             Icon(
               Icons.chat_bubble_outline,
-              size: 48,
+              size: 32,
               color: Colors.grey.shade400,
             ),
             const SizedBox(height: 16),
@@ -207,7 +207,7 @@ class ChatHistorySidebar extends StatelessWidget {
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontFamily: 'lufga',
-                fontSize: 16,
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 8),
@@ -217,7 +217,7 @@ class ChatHistorySidebar extends StatelessWidget {
               style: TextStyle(
                 color: Colors.grey.shade500,
                 fontFamily: 'lufga',
-                fontSize: 12,
+                fontSize: 9,
               ),
             ),
           ],
@@ -249,7 +249,7 @@ class ChatHistorySidebar extends StatelessWidget {
         child: Icon(
           Icons.chat_bubble_outline,
           color: Colors.green.shade600,
-          size: 20,
+          size: 15,
         ),
       ),
       title: Text(
@@ -257,7 +257,7 @@ class ChatHistorySidebar extends StatelessWidget {
         style: const TextStyle(
           fontFamily: 'lufga',
           fontWeight: FontWeight.w600,
-          fontSize: 14,
+          fontSize: 10,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -271,7 +271,7 @@ class ChatHistorySidebar extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'lufga',
               color: Colors.grey.shade600,
-              fontSize: 12,
+              fontSize: 8,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -279,14 +279,14 @@ class ChatHistorySidebar extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              Icon(Icons.schedule, size: 12, color: Colors.grey.shade500),
+              Icon(Icons.schedule, size: 8, color: Colors.grey.shade500),
               const SizedBox(width: 4),
               Text(
                 _formatDate(chat.createdAt),
                 style: TextStyle(
                   fontFamily: 'lufga',
                   color: Colors.grey.shade500,
-                  fontSize: 10,
+                  fontSize: 8,
                 ),
               ),
               const Spacer(),
@@ -301,7 +301,7 @@ class ChatHistorySidebar extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'lufga',
                     color: Colors.green.shade600,
-                    fontSize: 10,
+                    fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -329,10 +329,10 @@ class ChatHistorySidebar extends StatelessWidget {
                 // Close sidebar when starting new chat
                 onClose();
               },
-              icon: const Icon(Icons.add, size: 16),
+              icon: const Icon(Icons.add, size: 13),
               label: const Text(
                 "New Chat",
-                style: TextStyle(fontFamily: 'lufga', fontSize: 12),
+                style: TextStyle(fontFamily: 'lufga', fontSize: 8),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade600,
@@ -351,8 +351,8 @@ class ChatHistorySidebar extends StatelessWidget {
             icon:
                 isDeleting
                     ? SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: 12,
+                      height: 12,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.red.shade400,
@@ -361,7 +361,7 @@ class ChatHistorySidebar extends StatelessWidget {
                     : Icon(
                       Icons.delete_outline,
                       color: Colors.red.shade400,
-                      size: 20,
+                      size: 15,
                     ),
             style: IconButton.styleFrom(
               backgroundColor: Colors.red.shade50,

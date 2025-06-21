@@ -62,7 +62,7 @@ class CropCache {
         final crops = jsonList.map((json) => Crop.fromJson(json)).toList();
         _memoryCache[userId] = crops;
         _isLoaded[userId] = true;
-        
+
         if (kDebugMode) {
           final timestamp = prefs.getInt('$_timestampPrefix$userId') ?? 0;
           final lastSaved = DateTime.fromMillisecondsSinceEpoch(timestamp);
@@ -99,21 +99,29 @@ class CropCache {
   static Future<void> setCachedCrops(String userId, List<Crop> crops) async {
     _memoryCache[userId] = crops;
     _isLoaded[userId] = true;
-    
+
     // Save to persistent storage
     await _saveToPersistentStorage(userId, crops);
   }
 
   // Save to SharedPreferences
-  static Future<void> _saveToPersistentStorage(String userId, List<Crop> crops) async {
+  static Future<void> _saveToPersistentStorage(
+    String userId,
+    List<Crop> crops,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = json.encode(crops.map((crop) => crop.toJson()).toList());
-      
+      final jsonString = json.encode(
+        crops.map((crop) => crop.toJson()).toList(),
+      );
+
       await prefs.setString('$_storagePrefix$userId', jsonString);
       await prefs.setBool('$_loadedPrefix$userId', true);
-      await prefs.setInt('$_timestampPrefix$userId', DateTime.now().millisecondsSinceEpoch);
-      
+      await prefs.setInt(
+        '$_timestampPrefix$userId',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+
       if (kDebugMode) {
         print('Cache saved to persistent storage for user: $userId');
       }
@@ -169,7 +177,11 @@ class CropCache {
   }
 
   // Update specific crop in cache (memory + storage)
-  static Future<void> updateCropInCache(String userId, String cropId, Crop updatedCrop) async {
+  static Future<void> updateCropInCache(
+    String userId,
+    String cropId,
+    Crop updatedCrop,
+  ) async {
     if (isDataLoaded(userId)) {
       final crops = _memoryCache[userId];
       if (crops != null) {
@@ -194,7 +206,8 @@ class CropCache {
       'isLoaded': isLoaded,
       'hasMemoryCache': hasMemoryCache,
       'cropCount': cropCount,
-      'lastSaved': timestamp > 0 ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null,
+      'lastSaved':
+          timestamp > 0 ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null,
       'cacheSize': prefs.getString('$_storagePrefix$userId')?.length ?? 0,
     };
   }
@@ -203,10 +216,7 @@ class CropCache {
 class PlantationManagementPage extends StatefulWidget {
   final String userId;
 
-  const PlantationManagementPage({
-    super.key,
-    required this.userId,
-  });
+  const PlantationManagementPage({super.key, required this.userId});
 
   @override
   State<PlantationManagementPage> createState() =>
@@ -221,16 +231,21 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
 
   String get userId => widget.userId;
 
+  String dailySuggestion = 'Loading...';
+
+  String suggestionHeading = 'Today\'s Suggestion';
+
   @override
   void initState() {
     super.initState();
+    fetchDailySuggestion();
     loadCrops();
   }
 
   Future<void> loadCrops() async {
     // Initialize cache first (loads from persistent storage if available)
     await CropCache.initializeCache(userId);
-    
+
     // Check if data is already available in cache
     final cachedCrops = await CropCache.getCachedCrops(userId);
     if (cachedCrops != null && cachedCrops.isNotEmpty) {
@@ -238,7 +253,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         crops = cachedCrops;
         isLoading = false;
       });
-      
+
       if (kDebugMode) {
         print('Loaded ${cachedCrops.length} crops from cache');
       }
@@ -263,7 +278,10 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         isOnline = true;
       });
 
-      if (userId.isEmpty || userId == '0' || userId == 'null' || userId == 'undefined') {
+      if (userId.isEmpty ||
+          userId == '0' ||
+          userId == 'null' ||
+          userId == 'undefined') {
         setState(() {
           errorMessage = 'Invalid user ID';
           isLoading = false;
@@ -271,26 +289,32 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         return;
       }
 
-      final response = await http.get(
-        Uri.parse('https://agrihive-server91.onrender.com/getCrops?userId=$userId'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://agrihive-server91.onrender.com/getCrops?userId=$userId',
+            ),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
 
         if (responseData.containsKey('crops')) {
-          final List<dynamic> cropsData = responseData['crops'] as List<dynamic>;
-          final cropsList = cropsData.map((json) => Crop.fromJson(json)).toList();
-          
+          final List<dynamic> cropsData =
+              responseData['crops'] as List<dynamic>;
+          final cropsList =
+              cropsData.map((json) => Crop.fromJson(json)).toList();
+
           // Cache the results with persistent storage
           await CropCache.setCachedCrops(userId, cropsList);
-          
+
           setState(() {
             crops = cropsList;
             isLoading = false;
           });
-          
+
           if (kDebugMode) {
             print('Fetched and cached ${cropsList.length} crops from API');
           }
@@ -319,7 +343,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         isLoading = false;
         isOnline = false;
       });
-      
+
       // Try to load from cache when offline
       final cachedCrops = await CropCache.getCachedCrops(userId);
       if (cachedCrops != null && cachedCrops.isNotEmpty) {
@@ -327,37 +351,46 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           crops = cachedCrops;
           errorMessage = 'Showing cached data (Offline)';
         });
-        
+
         if (kDebugMode) {
           print('Network error, loaded ${cachedCrops.length} crops from cache');
         }
       }
-      
+
       if (kDebugMode) {
         print('Error fetching crops: $e');
       }
     }
   }
 
-  Future<bool> addCropsToDatabase(String userId, List<Map<String, dynamic>> cropData) async {
+  Future<bool> addCropsToDatabase(
+    String userId,
+    List<Map<String, dynamic>> cropData,
+  ) async {
     const String apiUrl = "https://agrihive-server91.onrender.com/addCrop";
 
     try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"userId": userId, "cropData": cropData}),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse(apiUrl),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({"userId": userId, "cropData": cropData}),
+          )
+          .timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
-        final success = responseBody["message"]?.toString().toLowerCase().contains("success") ?? false;
-        
+        final success =
+            responseBody["message"]?.toString().toLowerCase().contains(
+              "success",
+            ) ??
+            false;
+
         if (success) {
           // Refresh data after successful add to get server-generated IDs
           await refreshCrops();
         }
-        
+
         return success;
       } else {
         if (kDebugMode) {
@@ -377,11 +410,13 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     final url = Uri.parse('https://agrihive-server91.onrender.com/deleteCrop');
 
     try {
-      final response = await http.delete(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId, 'cropId': cropId}),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .delete(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId, 'cropId': cropId}),
+          )
+          .timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         // Remove from cache and update UI immediately
@@ -405,34 +440,37 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     }
   }
 
-  Future<bool> updateCropInDatabase(String userId, String cropId, Map<String, dynamic> cropData) async {
+  Future<bool> updateCropInDatabase(
+    String userId,
+    String cropId,
+    Map<String, dynamic> cropData,
+  ) async {
     final url = Uri.parse('https://agrihive-server91.onrender.com/updateCrop');
 
     try {
-      final response = await http.put(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'userId': userId,
-          'cropId': cropId,
-          'cropData': cropData,
-        }),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .put(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'userId': userId,
+              'cropId': cropId,
+              'cropData': cropData,
+            }),
+          )
+          .timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         // Update cache and UI immediately
-        final updatedCrop = Crop.fromJson({
-          'id': cropId,
-          ...cropData,
-        });
+        final updatedCrop = Crop.fromJson({'id': cropId, ...cropData});
         await CropCache.updateCropInCache(userId, cropId, updatedCrop);
-        
+
         // Refresh UI with updated cache
         final updatedCrops = await CropCache.getCachedCrops(userId) ?? [];
         setState(() {
           crops = updatedCrops;
         });
-        
+
         return true;
       } else {
         if (kDebugMode) {
@@ -445,6 +483,41 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         print('Error updating crop: $e');
       }
       return false;
+    }
+  }
+
+  Future<void> fetchDailySuggestion() async {
+    setState(() => isLoading = true);
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'http://agrihive-server91.onrender.com/getDailySuggestion?userId=$userId',
+        ),
+        headers: {'Accept': 'application/json', 'User-Agent': 'Flutter App'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          suggestionHeading = data['suggestion']['heading'] ?? 'Daily Tip';
+          dailySuggestion =
+              data['suggestion']['body'] ?? 'No suggestion available';
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          suggestionHeading = 'Error';
+          dailySuggestion =
+              'Server Error (${response.statusCode}): ${response.body}';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        suggestionHeading = 'Network Error';
+        dailySuggestion = 'Network Error: ${e.toString()}';
+        isLoading = false;
+      });
     }
   }
 
@@ -467,20 +540,35 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Add Crop', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Add Crop',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       SizedBox(height: 16),
-                      TextField(controller: nameController, decoration: InputDecoration(labelText: 'Crop Name')),
+                      TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(labelText: 'Crop Name'),
+                      ),
                       SizedBox(height: 12),
                       TextField(
                         controller: areaController,
-                        decoration: InputDecoration(labelText: 'Area (in acres)'),
+                        decoration: InputDecoration(
+                          labelText: 'Area (in acres)',
+                        ),
                         keyboardType: TextInputType.number,
                       ),
                       SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(selectedDate == null ? 'Select Date' : '${selectedDate!.toLocal()}'.split(' ')[0]),
+                          Text(
+                            selectedDate == null
+                                ? 'Select Date'
+                                : '${selectedDate!.toLocal()}'.split(' ')[0],
+                          ),
                           TextButton(
                             onPressed: () async {
                               DateTime? picked = await showDatePicker(
@@ -504,7 +592,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                         onPressed: () async {
                           final String name = nameController.text.trim();
                           final String area = areaController.text.trim();
-                          final String? date = selectedDate?.toIso8601String().split("T").first;
+                          final String? date =
+                              selectedDate?.toIso8601String().split("T").first;
 
                           if (name.isEmpty || area.isEmpty || date == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -519,11 +608,15 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                             "plantedDate": date,
                           };
 
-                          bool success = await addCropsToDatabase(userId, [crop]);
+                          bool success = await addCropsToDatabase(userId, [
+                            crop,
+                          ]);
                           if (success) {
                             Navigator.of(context).pop();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Crop added successfully!')),
+                              SnackBar(
+                                content: Text('Crop added successfully!'),
+                              ),
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -549,89 +642,105 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     );
   }
 
- 
-
   void showUpdateDialog(BuildContext context, String userId, Map crop) {
     final nameController = TextEditingController(text: crop['name']);
-    final areaController = TextEditingController(text: crop['area']?.toString());
+    final areaController = TextEditingController(
+      text: crop['area']?.toString(),
+    );
     DateTime? selectedDate = DateTime.tryParse(crop['plantedDate'] ?? '');
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Update Crop'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameController, decoration: InputDecoration(labelText: 'Crop Name')),
-                TextField(
-                  controller: areaController,
-                  decoration: InputDecoration(labelText: 'Area (in acres)'),
-                  keyboardType: TextInputType.number,
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Update Crop'),
+            content: StatefulBuilder(
+              builder: (context, setState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(selectedDate == null ? 'Select Date' : selectedDate!.toIso8601String().split('T')[0]),
-                    TextButton(
-                      onPressed: () async {
-                        DateTime? picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            selectedDate = picked;
-                          });
-                        }
-                      },
-                      child: Text('Pick Date'),
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(labelText: 'Crop Name'),
+                    ),
+                    TextField(
+                      controller: areaController,
+                      decoration: InputDecoration(labelText: 'Area (in acres)'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          selectedDate == null
+                              ? 'Select Date'
+                              : selectedDate!.toIso8601String().split('T')[0],
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                selectedDate = picked;
+                              });
+                            }
+                          },
+                          child: Text('Pick Date'),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = nameController.text.trim();
+                  final area = int.tryParse(areaController.text.trim()) ?? 0;
+                  final date = selectedDate?.toIso8601String().split('T').first;
+
+                  final updatedData = {
+                    'name': name,
+                    'area': area,
+                    'plantedDate': date,
+                  };
+
+                  final success = await updateCropInDatabase(
+                    userId,
+                    crop['id'],
+                    updatedData,
+                  );
+                  Navigator.pop(context);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        success
+                            ? 'Crop updated successfully'
+                            : 'Failed to update crop',
+                      ),
+                    ),
+                  );
+
+                  if (success) {
+                    // Refresh from cache (which was invalidated)
+                    await loadCrops();
+                  }
+                },
+                child: Text('Update'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              final area = int.tryParse(areaController.text.trim()) ?? 0;
-              final date = selectedDate?.toIso8601String().split('T').first;
-
-              final updatedData = {
-                'name': name,
-                'area': area,
-                'plantedDate': date,
-              };
-
-              final success = await updateCropInDatabase(userId, crop['id'], updatedData);
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(success ? 'Crop updated successfully' : 'Failed to update crop'),
-                ),
-              );
-
-              if (success) {
-                // Refresh from cache (which was invalidated)
-                await loadCrops();
-              }
-            },
-            child: Text('Update'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -669,7 +778,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                           style: TextStyle(
                             fontFamily: 'lufga',
                             color: Colors.white,
-                            fontSize: 25,
+                            fontSize: 18,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -679,105 +788,148 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                 ),
               ),
 
-              // First division - Show current user info
               Expanded(
-                flex: 2,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Row(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Suggestion Box
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(51, 5, 74, 41),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Color.fromARGB(127, 76, 175, 80),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                flex: 2,
-                                child: Container(
-                                  margin: EdgeInsets.only(
-                                    left: 16,
-                                    top: 8,
-                                    bottom: 8,
-                                    right: 8,
-                                  ),
-                                  padding: EdgeInsets.all(10),
-                                  height:
-                                      double
-                                          .infinity, // ⬅️ This makes the box stretch to max height
-                                  decoration: BoxDecoration(
-                                    color: Color.fromARGB(51, 5, 74, 41),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: Color.fromARGB(127, 76, 175, 80),
-                                      width: 1,
+                              // Heading
+                              Row(
+                                children: [
+                                  // const Icon(
+                                  //   Icons.light,
+                                  //   color: Colors.white70,
+                                  //   size: 18,
+                                  // ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      suggestionHeading,
+                                      style: const TextStyle(
+                                        fontFamily: 'lufga',
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment
-                                            .start, // Optional: center the text horizontally
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment
-                                            .start, // Optional: center the text vertically
-                                    children: [
-                                      Text(
-                                        'Todays Suggestion',
-                                        style: TextStyle(
-                                          fontFamily: 'lufga',
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                ],
                               ),
-
+                              const SizedBox(height: 5),
+                              Container(
+                                height: 1,
+                                color: const Color.fromARGB(100, 76, 175, 80),
+                              ),
+                              const SizedBox(height: 8),
+                              // Content
                               Expanded(
-                                flex: 1,
-                                child: Column(
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        margin: EdgeInsets.only(
-                                          right: 16,
-                                          left: 8,
-                                          top: 8,
-                                          bottom: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Color.fromARGB(48, 5, 74, 41),
-                                          borderRadius: BorderRadius.circular(
-                                            10,
+                                child:
+                                    isLoading
+                                        ? const Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                              SizedBox(height: 12),
+                                              Text(
+                                                'Loading...',
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          border: Border.all(
-                                            color: Color.fromARGB(
-                                              127,
-                                              76,
-                                              175,
-                                              80,
+                                        )
+                                        : SingleChildScrollView(
+                                          physics: BouncingScrollPhysics(),
+                                          child: Text(
+                                            dailySuggestion.isNotEmpty
+                                                ? dailySuggestion
+                                                : 'No suggestion available',
+                                            style: const TextStyle(
+                                              fontFamily: 'lufga',
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              height: 1.4,
+                                              fontWeight: FontWeight.w400,
                                             ),
-                                            width: 1,
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.only(bottom: 8),
-                                      child: Text(
-                                        'Random',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Random Icon Box
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(48, 5, 74, 41),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Color.fromARGB(127, 76, 175, 80),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.shuffle,
+                                    color: Colors.white70,
+                                    size: 32,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Random',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'lufga',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -803,7 +955,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                             child: Text(
                               'My Crops',
                               style: TextStyle(
-                                fontSize: 25,
+                                fontSize: 20,
                                 fontFamily: 'lufga',
                                 fontWeight: FontWeight.w500,
                                 color: Colors.white,
@@ -868,7 +1020,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           final crop = crops[index];
           return Padding(
             padding: const EdgeInsets.symmetric(
-              vertical: 8,
+              vertical: 5,
             ), // No horizontal padding
 
             child: GestureDetector(
@@ -955,7 +1107,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                                       Icon(
                                         Icons.grass,
                                         color: Colors.white,
-                                        size: 35,
+                                        size: 28,
                                       ),
                                       SizedBox(width: 10),
                                       Expanded(
@@ -969,22 +1121,22 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                                                 fontFamily: 'lufga',
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 18,
+                                                fontSize: 13,
                                               ),
                                             ),
-                                            SizedBox(height: 4),
+                                            SizedBox(height: 3),
                                             Text(
                                               'Sowed on:',
                                               style: TextStyle(
                                                 color: Colors.white70,
-                                                fontSize: 12,
+                                                fontSize: 9,
                                               ),
                                             ),
                                             Text(
                                               crop.plantedDate ?? "Unknown",
                                               style: TextStyle(
                                                 color: Colors.white70,
-                                                fontSize: 15,
+                                                fontSize: 11,
                                               ),
                                             ),
                                           ],
@@ -995,13 +1147,14 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                                         style: TextStyle(
                                           color: Colors.yellow[500],
                                           fontFamily: 'lufga',
+                                          fontSize: 11
                                         ),
                                       ),
                                       IconButton(
                                         icon: Icon(
                                           Icons.delete,
                                           color: Colors.redAccent,
-                                          size: 35,
+                                          size: 28,
                                         ),
                                         onPressed: () {
                                           // Handle deletion
@@ -1086,5 +1239,3 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     );
   }
 }
-
- 
