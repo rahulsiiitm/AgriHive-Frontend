@@ -17,7 +17,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String userId = 'user1';
   Map<String, dynamic>? profileData;
   final ImagePicker _picker = ImagePicker();
-  final String apiBaseUrl = 'http://10.0.2.2:5000';
+  final String apiBaseUrl = 'http://agrihive-server91.onrender.com';
   
   // Cache variables
   static Map<String, dynamic>? _cachedProfileData;
@@ -187,7 +187,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   Text(
                     profileData!['name'] ?? 'Name',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
                       shadows: [
@@ -199,12 +199,12 @@ class _ProfilePageState extends State<ProfilePage> {
                       ],
                     ),
                   ),
-                  SizedBox(height: 8),
+                  SizedBox(height: 2),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.location_on_outlined, 
-                           color: Colors.white.withOpacity(0.9), size: 18),
+                           color: Colors.white.withOpacity(0.9), size: 15),
                       SizedBox(width: 4),
                       Text(
                         profileData!['location'] ?? 'Location',
@@ -307,6 +307,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ]),
           SizedBox(height: 20),
           _buildMenuItem(Icons.logout, 'Logout', _showLogout, isDestructive: true),
+          SizedBox(height: 20),
         ],
       ),
     );

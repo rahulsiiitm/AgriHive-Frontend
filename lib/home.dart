@@ -1,9 +1,36 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:my_app/weather/weather_card.dart';
 import 'package:my_app/weather/weather_service.dart';
+
+class Suggestion {
+  final String category;
+  final String crop;
+  final String priority;
+  final String text;
+
+  Suggestion({
+    required this.category,
+    required this.crop,
+    required this.priority,
+    required this.text,
+  });
+
+  factory Suggestion.fromJson(Map<String, dynamic> json) {
+    return Suggestion(
+      category: json['category'],
+      crop: json['crop'],
+      priority: json['priority'],
+      text: json['text'],
+    );
+  }
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,6 +47,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final WeatherService _weatherService = WeatherService();
   Map<String, dynamic> weatherData = {};
   bool isLoading = false;
+  List<Suggestion> suggestions = [];
 
   // Animation controllers
   late AnimationController _headerAnimationController;
@@ -39,13 +67,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     formattedDate = _dateFormatter.format(DateTime.now());
-    
+
     // Initialize animations
     _headerAnimationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _cardsAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -54,21 +82,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _headerSlideAnimation = Tween<Offset>(
       begin: _hasAnimatedOnce ? Offset.zero : const Offset(0, -1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _headerAnimationController,
-      curve: Curves.easeOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _headerAnimationController,
+        curve: Curves.easeOut,
+      ),
+    );
 
     _cardsFadeAnimation = Tween<double>(
       begin: _hasAnimatedOnce ? 1.0 : 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _cardsAnimationController,
-      curve: Curves.easeIn,
-    ));
+    ).animate(
+      CurvedAnimation(parent: _cardsAnimationController, curve: Curves.easeIn),
+    );
 
     _loadWeatherData();
     _startAnimations();
+    fetchSuggestion();
   }
 
   void _startAnimations() {
@@ -90,6 +120,38 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _headerAnimationController.dispose();
     _cardsAnimationController.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchSuggestion() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('http://10.0.2.2:5000/getSuggestions?userId=user1'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final jsonData = json.decode(response.body);
+
+      if (jsonData['success'] == true && jsonData['suggestions'] != null) {
+        final data = jsonData['suggestions'] as Map<String, dynamic>;
+        final List<Suggestion> loaded = [];
+
+        for (var key in ['first', 'second', 'third', 'fourth']) {
+          if (data.containsKey(key)) {
+            loaded.add(Suggestion.fromJson(data[key]));
+          }
+        }
+
+        setState(() {
+          suggestions = loaded;
+        });
+      } else {
+        print("Invalid response format");
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
   }
 
   Future<void> _loadWeatherData() async {
@@ -232,7 +294,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -248,6 +309,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             isLoading: isLoading,
             onRefresh: _refreshWeatherData,
             cardsAnimation: _cardsFadeAnimation,
+            suggestions: suggestions, // 👈
           ),
         ],
       ),
@@ -368,12 +430,75 @@ class _BodyContentWidget extends StatelessWidget {
   final VoidCallback onRefresh;
   final Animation<double> cardsAnimation;
 
+  final List<Suggestion> suggestions;
+
   const _BodyContentWidget({
     required this.weatherData,
     required this.isLoading,
     required this.onRefresh,
     required this.cardsAnimation,
+    required this.suggestions,
   });
+
+  Widget buildCategoryLabel(String category) {
+    IconData icon;
+    Color iconColor;
+
+    switch (category.toLowerCase()) {
+      case 'irrigation':
+        icon = Icons.water_drop;
+        iconColor = Colors.blue; // 💧 Blue for irrigation
+        break;
+      case 'pest_control':
+        icon = Icons.bug_report;
+        iconColor = Colors.red; // 🐞 Red for pests
+        break;
+      case 'protection':
+        icon = Icons.shield;
+        iconColor = Colors.deepPurple; // 🛡️ Purple for protection
+        break;
+      case 'care':
+        icon = Icons.eco;
+        iconColor = Colors.green; // 🌿 Green for care
+        break;
+      default:
+        icon = Icons.info_outline;
+        iconColor = Colors.orange; // default fallback
+    }
+
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color: iconColor,
+          shadows: const [
+            Shadow(
+              offset: Offset(1, 1),
+              blurRadius: 2,
+              color: Color.fromARGB(137, 255, 255, 255),
+            ),
+          ],
+        ),
+        const SizedBox(width: 4),
+        Text(
+          category.toUpperCase(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: iconColor,
+            shadows: const [
+              Shadow(
+                offset: Offset(0, 0),
+                blurRadius: 12,
+                color: Color.fromARGB(165, 255, 255, 255),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -402,12 +527,16 @@ class _BodyContentWidget extends StatelessWidget {
                     children: [
                       // Left Column (2/3 width)
                       Expanded(
-                        flex: 2,
+                        flex: 3,
                         child: Column(
                           children: [
                             Container(
-                              height: 100,
-                              margin: const EdgeInsets.only(right: 8, bottom: 8),
+                              height: 130,
+                              margin: const EdgeInsets.only(
+                                right: 8,
+                                bottom: 8,
+                              ),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.4),
                                 borderRadius: BorderRadius.circular(16),
@@ -416,10 +545,95 @@ class _BodyContentWidget extends StatelessWidget {
                                   width: 1,
                                 ),
                               ),
+                              child:
+                                  (suggestions.isNotEmpty)
+                                      ? SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            buildCategoryLabel(
+                                              suggestions[0].category,
+                                            ),
+
+                                            const SizedBox(height: 2),
+
+                                            // Crop
+                                            Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  const TextSpan(
+                                                    text: 'Crop: ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text: suggestions[0].crop,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // Priority
+                                            Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  const TextSpan(
+                                                    text: 'Priority: ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text:
+                                                        suggestions[0].priority,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 8),
+
+                                            // Main Suggestion Text
+                                            Text(
+                                              suggestions[0].text,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.normal,
+                                                color: Color.fromARGB(
+                                                  255,
+                                                  255,
+                                                  255,
+                                                  255,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                      : const Center(
+                                        child: Text(
+                                          'Loading...',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
                             ),
+
                             Container(
                               height: 100,
                               margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.4),
                                 borderRadius: BorderRadius.circular(16),
@@ -428,6 +642,96 @@ class _BodyContentWidget extends StatelessWidget {
                                   width: 1,
                                 ),
                               ),
+                              child:
+                                  suggestions.any((s) => s.category == 'care')
+                                      ? SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            buildCategoryLabel('care'),
+                                            const SizedBox(height: 2),
+                                            Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  const TextSpan(
+                                                    text: 'Crop: ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text:
+                                                        suggestions
+                                                            .firstWhere(
+                                                              (s) =>
+                                                                  s.category ==
+                                                                  'care',
+                                                            )
+                                                            .crop,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  const TextSpan(
+                                                    text: 'Priority: ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text:
+                                                        suggestions
+                                                            .firstWhere(
+                                                              (s) =>
+                                                                  s.category ==
+                                                                  'care',
+                                                            )
+                                                            .priority,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              suggestions
+                                                  .firstWhere(
+                                                    (s) => s.category == 'care',
+                                                  )
+                                                  .text,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.normal,
+                                                color: Color.fromARGB(
+                                                  255,
+                                                  255,
+                                                  255,
+                                                  255,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                      : const Center(
+                                        child: Text(
+                                          'Loading...',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
                             ),
                           ],
                         ),
@@ -435,10 +739,11 @@ class _BodyContentWidget extends StatelessWidget {
 
                       // Right Column (1/3 width)
                       Expanded(
-                        flex: 1,
+                        flex: 2,
                         child: Container(
-                          height: 208,
+                          height: 238, // ✅ Increased by 30px
                           margin: const EdgeInsets.only(left: 0),
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(16),
@@ -447,6 +752,100 @@ class _BodyContentWidget extends StatelessWidget {
                               width: 1,
                             ),
                           ),
+                          child:
+                              suggestions.any((s) => s.category == 'protection')
+                                  ? SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        buildCategoryLabel('protection'),
+
+                                        const SizedBox(height: 2),
+
+                                        Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: 'Crop: ',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text:
+                                                    suggestions
+                                                        .firstWhere(
+                                                          (s) =>
+                                                              s.category ==
+                                                              'protection',
+                                                        )
+                                                        .crop,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: 'Priority: ',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text:
+                                                    suggestions
+                                                        .firstWhere(
+                                                          (s) =>
+                                                              s.category ==
+                                                              'protection',
+                                                        )
+                                                        .priority,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 4),
+
+                                        Text(
+                                          suggestions
+                                              .firstWhere(
+                                                (s) =>
+                                                    s.category == 'protection',
+                                              )
+                                              .text,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.normal,
+                                            color: Color.fromARGB(
+                                              255,
+                                              255,
+                                              255,
+                                              255,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                  : const Center(
+                                    child: Text(
+                                      'Loading...',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
                         ),
                       ),
                     ],
@@ -458,6 +857,7 @@ class _BodyContentWidget extends StatelessWidget {
                   Container(
                     height: 100,
                     width: double.infinity,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.4),
                       borderRadius: BorderRadius.circular(16),
@@ -466,6 +866,70 @@ class _BodyContentWidget extends StatelessWidget {
                         width: 1,
                       ),
                     ),
+                    child:
+                        (suggestions.isNotEmpty)
+                            ? SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  buildCategoryLabel(
+                                    suggestions[3].category,
+                                  ), // Use index or filter by category
+
+                                  const SizedBox(height: 2),
+
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: 'Crop: ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: suggestions[3].crop,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text: 'Priority: ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: suggestions[3].priority,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    suggestions[3].text,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.normal,
+                                      color: Color.fromARGB(255, 255, 255, 255),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : const Center(
+                              child: Text(
+                                'Loading...',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
                   ),
                 ],
               ),
