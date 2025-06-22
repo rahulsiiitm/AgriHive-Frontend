@@ -9,13 +9,14 @@ import 'dart:convert';
 import 'package:my_app/weather/weather_card.dart';
 import 'package:my_app/weather/weather_service.dart';
 
+// Models
 class Suggestion {
   final String category;
   final String crop;
   final String priority;
   final String text;
 
-  Suggestion({
+  const Suggestion({
     required this.category,
     required this.crop,
     required this.priority,
@@ -24,95 +25,235 @@ class Suggestion {
 
   factory Suggestion.fromJson(Map<String, dynamic> json) {
     return Suggestion(
-      category: json['category'],
-      crop: json['crop'],
-      priority: json['priority'],
-      text: json['text'],
+      category: json['category'] ?? '',
+      crop: json['crop'] ?? '',
+      priority: json['priority'] ?? '',
+      text: json['text'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'category': category,
+      'crop': crop,
+      'priority': priority,
+      'text': text,
+    };
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class _CategoryData {
+  final IconData icon;
+  final Color color;
+  
+  const _CategoryData(this.icon, this.color);
+}
 
+// Constants
+class _Constants {
+  static const Duration cacheValidDuration = Duration(minutes: 30);
+  static const Duration headerAnimationDuration = Duration(milliseconds: 800); // Slower
+  static const Duration cardsAnimationDuration = Duration(milliseconds: 600);   // Slower
+  static const Duration animationDelay = Duration(milliseconds: 500);           // Longer delay
+  static const Duration apiTimeout = Duration(seconds: 15);
+  
+  // Cache keys
+  static const String weatherCacheKey = 'cached_weather_data';
+  static const String lastFetchTimeKey = 'last_weather_fetch_time';
+  static const String suggestionsCacheKey = 'cached_suggestions_data';
+  static const String lastSuggestionsFetchTimeKey = 'last_suggestions_fetch_time';
+  static const String userNameCacheKey = 'cached_user_name';
+  static const String lastUserFetchTimeKey = 'last_user_fetch_time';
+  
+  // Category configuration
+  static const Map<String, _CategoryData> categoryConfig = {
+    'irrigation': _CategoryData(Icons.water_drop, Colors.blue),
+    'pest_control': _CategoryData(Icons.bug_report, Colors.red),
+    'protection': _CategoryData(Icons.shield, Color.fromARGB(255, 0, 187, 255)),
+    'care': _CategoryData(Icons.eco, Colors.green),
+  };
+}
+
+// Services
+class _CacheService {
+  static Future<void> cacheData(String key, String data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, data);
+    } catch (e) {
+      debugPrint('Error caching data for key $key: $e');
+    }
+  }
+
+  static Future<String?> getCachedData(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } catch (e) {
+      debugPrint('Error getting cached data for key $key: $e');
+      return null;
+    }
+  }
+
+  static Future<void> setCacheTimestamp(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, DateTime.now().toIso8601String());
+    } catch (e) {
+      debugPrint('Error setting cache timestamp for key $key: $e');
+    }
+  }
+
+  static Future<bool> isCacheValid(String timestampKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestampString = prefs.getString(timestampKey);
+      
+      if (timestampString != null) {
+        final timestamp = DateTime.parse(timestampString);
+        return DateTime.now().difference(timestamp) < _Constants.cacheValidDuration;
+      }
+    } catch (e) {
+      debugPrint('Error checking cache validity for key $timestampKey: $e');
+    }
+    return false;
+  }
+}
+
+class _SuggestionsService {
+  static Future<List<Suggestion>> fetchSuggestions(String userId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('https://agrihive-server91.onrender.com/getSuggestions?userId=$userId'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(_Constants.apiTimeout);
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        
+        if (jsonData['success'] == true && jsonData['suggestions'] != null) {
+          return _parseSuggestions(jsonData['suggestions']);
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        throw HttpException('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching suggestions: $e');
+      rethrow;
+    }
+  }
+
+  static List<Suggestion> _parseSuggestions(Map<String, dynamic> data) {
+    final suggestions = <Suggestion>[];
+    
+    for (var key in ['first', 'second', 'third', 'fourth']) {
+      if (data.containsKey(key)) {
+        suggestions.add(Suggestion.fromJson(data[key]));
+      }
+    }
+    
+    return suggestions;
+  }
+
+  static List<Suggestion> getMockSuggestions() {
+    return [
+      const Suggestion(
+        category: 'irrigation',
+        crop: 'Wheat',
+        priority: 'High',
+        text: 'Water your wheat crop early morning. Soil moisture should be maintained at 70%.',
+      ),
+      const Suggestion(
+        category: 'care',
+        crop: 'Rice', 
+        priority: 'Medium',
+        text: 'Apply organic fertilizer. Monitor for any yellowing of leaves.',
+      ),
+      const Suggestion(
+        category: 'protection',
+        crop: 'Tomato',
+        priority: 'High', 
+        text: 'Inspect plants for pest damage. Use neem oil spray if needed.',
+      ),
+      const Suggestion(
+        category: 'pest_control',
+        crop: 'Cotton',
+        priority: 'Medium',
+        text: 'Check for bollworm infestation. Apply biological pesticide if required.',
+      ),
+    ];
+  }
+}
+
+class _UserService {
+  static Future<String> fetchUserName(String userId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('http://agrihive-server91.onrender.com/get_farmer_profile?userId=$userId&field=name'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(_Constants.apiTimeout);
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        
+        if (jsonData.containsKey('name')) {
+          String fullName = jsonData['name'] ?? 'User';
+          return fullName.split(' ').first;
+        } else {
+          throw Exception('Name field not found in response');
+        }
+      } else {
+        throw HttpException('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching user name: $e');
+      rethrow;
+    }
+  }
+}
+
+// Main HomePage Widget
+class HomePage extends StatefulWidget {
+  final dynamic userId;
+
+  const HomePage({super.key, required this.userId});
+  
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  static const String name = "Yogita";
-  late final String formattedDate;
-  static final DateFormat _dateFormatter = DateFormat('EEEE dd-MM-yyyy');
-
   final WeatherService _weatherService = WeatherService();
+  
+  // State variables
   Map<String, dynamic> weatherData = {};
   bool isLoading = false;
   List<Suggestion> suggestions = [];
-
+  Map<String, Suggestion> _suggestionsByCategory = {};
+  String userName = 'User';
+  
   // Animation controllers
   late AnimationController _headerAnimationController;
   late AnimationController _cardsAnimationController;
   late Animation<Offset> _headerSlideAnimation;
   late Animation<double> _cardsFadeAnimation;
-
-  // Cache duration - fetch new data only after this time
-  static const Duration cacheValidDuration = Duration(minutes: 30);
-  static const String weatherCacheKey = 'cached_weather_data';
-  static const String lastFetchTimeKey = 'last_weather_fetch_time';
-
-  // Static variable to track if animations have played
+  
   static bool _hasAnimatedOnce = false;
+  
+  late final String formattedDate;
 
   @override
   void initState() {
     super.initState();
-    formattedDate = _dateFormatter.format(DateTime.now());
-
-    // Initialize animations
-    _headerAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _cardsAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-
-    _headerSlideAnimation = Tween<Offset>(
-      begin: _hasAnimatedOnce ? Offset.zero : const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _headerAnimationController,
-        curve: Curves.easeOut,
-      ),
-    );
-
-    _cardsFadeAnimation = Tween<double>(
-      begin: _hasAnimatedOnce ? 1.0 : 0.0,
-      end: 1.0,
-    ).animate(
-      CurvedAnimation(parent: _cardsAnimationController, curve: Curves.easeIn),
-    );
-
-    _loadWeatherData();
-    _startAnimations();
-    fetchSuggestion();
-  }
-
-  void _startAnimations() {
-    if (!_hasAnimatedOnce) {
-      _headerAnimationController.forward();
-      Future.delayed(const Duration(milliseconds: 400), () {
-        _cardsAnimationController.forward();
-      });
-      _hasAnimatedOnce = true;
-    } else {
-      // Skip animations - set to final state immediately
-      _headerAnimationController.value = 1.0;
-      _cardsAnimationController.value = 1.0;
-    }
+    formattedDate = DateFormat('EEEE dd-MM-yyyy').format(DateTime.now());
+    _initializeAnimations();
+    _loadAllData();
   }
 
   @override
@@ -122,108 +263,140 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<void> fetchSuggestion() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse('http://10.0.2.2:5000/getSuggestions?userId=user1'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 10));
+  void _initializeAnimations() {
+    _headerAnimationController = AnimationController(
+      duration: _Constants.headerAnimationDuration,
+      vsync: this,
+    );
 
-      final jsonData = json.decode(response.body);
+    _cardsAnimationController = AnimationController(
+      duration: _Constants.cardsAnimationDuration,
+      vsync: this,
+    );
 
-      if (jsonData['success'] == true && jsonData['suggestions'] != null) {
-        final data = jsonData['suggestions'] as Map<String, dynamic>;
-        final List<Suggestion> loaded = [];
+    _headerSlideAnimation = Tween<Offset>(
+      begin: _hasAnimatedOnce ? Offset.zero : const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _headerAnimationController,
+      curve: Curves.easeOut, // More noticeable curve
+    ));
 
-        for (var key in ['first', 'second', 'third', 'fourth']) {
-          if (data.containsKey(key)) {
-            loaded.add(Suggestion.fromJson(data[key]));
-          }
-        }
+    _cardsFadeAnimation = Tween<double>(
+      begin: _hasAnimatedOnce ? 1.0 : 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _cardsAnimationController, 
+      curve: Curves.easeInOut, // Smoother curve
+    ));
 
-        setState(() {
-          suggestions = loaded;
-        });
-      } else {
-        print("Invalid response format");
-      }
-    } catch (e) {
-      print('Error: $e');
+    _startAnimations();
+  }
+
+  void _startAnimations() {
+    if (!_hasAnimatedOnce) {
+      _headerAnimationController.forward();
+      Future.delayed(_Constants.animationDelay, () {
+        if (mounted) _cardsAnimationController.forward();
+      });
+      _hasAnimatedOnce = true;
+    } else {
+      _headerAnimationController.value = 1.0;
+      _cardsAnimationController.value = 1.0;
     }
   }
 
-  Future<void> _loadWeatherData() async {
-    // Try to load cached data first
-    final cachedData = await _loadCachedWeatherData();
+  void _loadAllData() {
+    Future.wait([
+      _loadUserName(),
+      _loadWeatherData(),
+      _loadSuggestionsData(),
+    // ignore: body_might_complete_normally_catch_error
+    ]).catchError((error) {
+      debugPrint('Error loading data: $error');
+    });
+  }
 
-    if (cachedData != null) {
-      // Use cached data immediately
-      setState(() {
-        weatherData = cachedData;
-        isLoading = false;
-      });
+  Future<void> _onRefresh() async {
+    await Future.wait([
+      _fetchUserName(),
+      _refreshWeatherData(),
+      _fetchSuggestions(),
+    ]);
+  }
 
-      // Check if cache is still valid
-      if (await _isCacheValid()) {
-        return; // Cache is valid, no need to fetch new data
+  // User name methods
+  Future<void> _loadUserName() async {
+    final cachedName = await _CacheService.getCachedData(_Constants.userNameCacheKey);
+    final isCacheValid = await _CacheService.isCacheValid(_Constants.lastUserFetchTimeKey);
+
+    if (cachedName != null && cachedName.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          userName = cachedName;
+        });
       }
+      if (isCacheValid) return;
     }
 
-    // Cache is invalid or doesn't exist, fetch new data
+    await _fetchUserName();
+  }
+
+  Future<void> _fetchUserName() async {
+    try {
+      final fetchedName = await _UserService.fetchUserName(widget.userId.toString());
+      
+      await Future.wait([
+        _CacheService.cacheData(_Constants.userNameCacheKey, fetchedName),
+        _CacheService.setCacheTimestamp(_Constants.lastUserFetchTimeKey),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          userName = fetchedName;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching user name: $e');
+    }
+  }
+
+  // Weather data methods
+  Future<void> _loadWeatherData() async {
+    final cachedData = await _loadCachedWeatherData();
+    final isCacheValid = await _CacheService.isCacheValid(_Constants.lastFetchTimeKey);
+
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          weatherData = cachedData;
+          isLoading = false;
+        });
+      }
+      if (isCacheValid) return;
+    }
+
     await _fetchWeatherData();
   }
 
   Future<Map<String, dynamic>?> _loadCachedWeatherData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedDataString = prefs.getString(weatherCacheKey);
-
+      final cachedDataString = await _CacheService.getCachedData(_Constants.weatherCacheKey);
       if (cachedDataString != null) {
         return json.decode(cachedDataString) as Map<String, dynamic>;
       }
     } catch (e) {
-      print('Error loading cached weather data: $e');
+      debugPrint('Error loading cached weather data: $e');
     }
     return null;
   }
 
-  Future<bool> _isCacheValid() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastFetchTimeString = prefs.getString(lastFetchTimeKey);
-
-      if (lastFetchTimeString != null) {
-        final lastFetchTime = DateTime.parse(lastFetchTimeString);
-        final now = DateTime.now();
-
-        return now.difference(lastFetchTime) < cacheValidDuration;
-      }
-    } catch (e) {
-      print('Error checking cache validity: $e');
-    }
-    return false;
-  }
-
-  Future<void> _cacheWeatherData(Map<String, dynamic> data) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(weatherCacheKey, json.encode(data));
-      await prefs.setString(lastFetchTimeKey, DateTime.now().toIso8601String());
-    } catch (e) {
-      print('Error caching weather data: $e');
-    }
-  }
-
   Future<void> _fetchWeatherData() async {
-    setState(() => isLoading = true);
+    if (mounted) setState(() => isLoading = true);
 
     try {
       final data = await _weatherService.getWeather(forceRefresh: false);
 
-      print('Received weather data: $data');
-
       if (data != null && data['success'] == true) {
         final transformedData = {
           'location': data['location'],
@@ -233,35 +406,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           'error': null,
         };
 
-        // Cache the new data
-        await _cacheWeatherData(transformedData);
+        await Future.wait([
+          _CacheService.cacheData(_Constants.weatherCacheKey, json.encode(transformedData)),
+          _CacheService.setCacheTimestamp(_Constants.lastFetchTimeKey),
+        ]);
 
-        setState(() {
-          weatherData = transformedData;
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            weatherData = transformedData;
+            isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            weatherData = {'error': data?['error'] ?? 'No weather data received'};
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching weather data: $e');
+      if (mounted) {
         setState(() {
-          weatherData = {'error': data?['error'] ?? 'No weather data received'};
+          weatherData = {'error': 'Failed to fetch weather data: $e'};
           isLoading = false;
         });
       }
-    } catch (e) {
-      print('Error fetching weather data: $e');
-      setState(() {
-        weatherData = {'error': 'Failed to fetch weather data: $e'};
-        isLoading = false;
-      });
     }
   }
 
   Future<void> _refreshWeatherData() async {
-    setState(() => isLoading = true);
+    if (mounted) setState(() => isLoading = true);
 
     try {
       final data = await _weatherService.getWeather(forceRefresh: true);
-
-      print('Refreshed weather data: $data');
 
       if (data != null && data['success'] == true) {
         final transformedData = {
@@ -272,25 +451,91 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           'error': null,
         };
 
-        // Cache the refreshed data
-        await _cacheWeatherData(transformedData);
+        await Future.wait([
+          _CacheService.cacheData(_Constants.weatherCacheKey, json.encode(transformedData)),
+          _CacheService.setCacheTimestamp(_Constants.lastFetchTimeKey),
+        ]);
 
+        if (mounted) {
+          setState(() {
+            weatherData = transformedData;
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing weather data: $e');
+      if (mounted) {
         setState(() {
-          weatherData = transformedData;
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          weatherData = {'error': data?['error'] ?? 'No weather data received'};
+          weatherData = {'error': 'Failed to refresh weather data: $e'};
           isLoading = false;
         });
       }
+    }
+  }
+
+  // Suggestions data methods
+  Future<void> _loadSuggestionsData() async {
+    final cachedSuggestions = await _loadCachedSuggestions();
+    final isCacheValid = await _CacheService.isCacheValid(_Constants.lastSuggestionsFetchTimeKey);
+
+    if (cachedSuggestions != null && cachedSuggestions.isNotEmpty) {
+      _updateSuggestionsState(cachedSuggestions);
+      if (isCacheValid) return;
+    }
+
+    await _fetchSuggestions();
+  }
+
+  Future<List<Suggestion>?> _loadCachedSuggestions() async {
+    try {
+      final cachedString = await _CacheService.getCachedData(_Constants.suggestionsCacheKey);
+      if (cachedString != null) {
+        final jsonList = json.decode(cachedString) as List<dynamic>;
+        return jsonList.map((json) => Suggestion.fromJson(json as Map<String, dynamic>)).toList();
+      }
     } catch (e) {
-      print('Error refreshing weather data: $e');
+      debugPrint('Error loading cached suggestions: $e');
+    }
+    return null;
+  }
+
+  Future<void> _fetchSuggestions() async {
+    try {
+      final fetchedSuggestions = await _SuggestionsService.fetchSuggestions(widget.userId.toString());
+      await _cacheSuggestions(fetchedSuggestions);
+      _updateSuggestionsState(fetchedSuggestions);
+    } catch (e) {
+      debugPrint('🔄 Falling back to mock data due to error: $e');
+      final mockSuggestions = _SuggestionsService.getMockSuggestions();
+      await _cacheSuggestions(mockSuggestions);
+      _updateSuggestionsState(mockSuggestions);
+    }
+  }
+
+  void _updateSuggestionsState(List<Suggestion> newSuggestions) {
+    final categoryMap = <String, Suggestion>{};
+    for (var suggestion in newSuggestions) {
+      categoryMap[suggestion.category] = suggestion;
+    }
+
+    if (mounted) {
       setState(() {
-        weatherData = {'error': 'Failed to refresh weather data: $e'};
-        isLoading = false;
+        suggestions = newSuggestions;
+        _suggestionsByCategory = categoryMap;
       });
+    }
+  }
+
+  Future<void> _cacheSuggestions(List<Suggestion> suggestions) async {
+    try {
+      final jsonList = suggestions.map((s) => s.toJson()).toList();
+      await Future.wait([
+        _CacheService.cacheData(_Constants.suggestionsCacheKey, json.encode(jsonList)),
+        _CacheService.setCacheTimestamp(_Constants.lastSuggestionsFetchTimeKey),
+      ]);
+    } catch (e) {
+      debugPrint('Error caching suggestions: $e');
     }
   }
 
@@ -298,26 +543,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          const _BackgroundWidget(),
-          _CurvedHeaderWidget(animation: _headerSlideAnimation),
-          _GreetingWidget(name: name, formattedDate: formattedDate),
-          const _ProfileIconWidget(),
-          _BodyContentWidget(
-            weatherData: weatherData,
-            isLoading: isLoading,
-            onRefresh: _refreshWeatherData,
-            cardsAnimation: _cardsFadeAnimation,
-            suggestions: suggestions, // 👈
-          ),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: Stack(
+          children: [
+            const _BackgroundWidget(),
+            _CurvedHeaderWidget(animation: _headerSlideAnimation),
+            _GreetingWidget(name: userName, formattedDate: formattedDate),
+            const _ProfileIconWidget(),
+            _BodyContentWidget(
+              weatherData: weatherData,
+              isLoading: isLoading,
+              cardsAnimation: _cardsFadeAnimation,
+              suggestions: suggestions,
+              suggestionsByCategory: _suggestionsByCategory,
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// Background widget
+// UI Components
 class _BackgroundWidget extends StatelessWidget {
   const _BackgroundWidget();
 
@@ -333,12 +581,13 @@ class _BackgroundWidget extends StatelessWidget {
           fit: BoxFit.cover,
         ),
       ),
-      foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(0.2)),
+      foregroundDecoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.2),
+      ),
     );
   }
 }
 
-// Animated Curved Header
 class _CurvedHeaderWidget extends StatelessWidget {
   final Animation<Offset> animation;
 
@@ -366,7 +615,6 @@ class _CurvedHeaderWidget extends StatelessWidget {
   }
 }
 
-// Greeting widget
 class _GreetingWidget extends StatelessWidget {
   final String name;
   final String formattedDate;
@@ -405,7 +653,6 @@ class _GreetingWidget extends StatelessWidget {
   }
 }
 
-// Profile Icon
 class _ProfileIconWidget extends StatelessWidget {
   const _ProfileIconWidget();
 
@@ -423,80 +670,88 @@ class _ProfileIconWidget extends StatelessWidget {
   }
 }
 
-// Body with Animated Cards
 class _BodyContentWidget extends StatelessWidget {
   final Map<String, dynamic> weatherData;
   final bool isLoading;
-  final VoidCallback onRefresh;
   final Animation<double> cardsAnimation;
-
   final List<Suggestion> suggestions;
+  final Map<String, Suggestion> suggestionsByCategory;
 
   const _BodyContentWidget({
     required this.weatherData,
     required this.isLoading,
-    required this.onRefresh,
     required this.cardsAnimation,
     required this.suggestions,
+    required this.suggestionsByCategory,
   });
 
-  Widget buildCategoryLabel(String category) {
-    IconData icon;
-    Color iconColor;
-
-    switch (category.toLowerCase()) {
-      case 'irrigation':
-        icon = Icons.water_drop;
-        iconColor = Colors.blue; // 💧 Blue for irrigation
-        break;
-      case 'pest_control':
-        icon = Icons.bug_report;
-        iconColor = Colors.red; // 🐞 Red for pests
-        break;
-      case 'protection':
-        icon = Icons.shield;
-        iconColor = Colors.deepPurple; // 🛡️ Purple for protection
-        break;
-      case 'care':
-        icon = Icons.eco;
-        iconColor = Colors.green; // 🌿 Green for care
-        break;
-      default:
-        icon = Icons.info_outline;
-        iconColor = Colors.orange; // default fallback
-    }
-
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 14,
-          color: iconColor,
-          shadows: const [
-            Shadow(
-              offset: Offset(1, 1),
-              blurRadius: 2,
-              color: Color.fromARGB(137, 255, 255, 255),
-            ),
-          ],
-        ),
-        const SizedBox(width: 4),
-        Text(
-          category.toUpperCase(),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: iconColor,
+  Widget _buildCategoryLabel(String category) {
+    final config = _Constants.categoryConfig[category.toLowerCase()] ?? 
+                   const _CategoryData(Icons.info_outline, Colors.orange);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            config.icon,
+            size: 12,
+            color: config.color,
             shadows: const [
-              Shadow(
-                offset: Offset(0, 0),
-                blurRadius: 12,
-                color: Color.fromARGB(165, 255, 255, 255),
-              ),
+              Shadow(offset: Offset(1, 1), blurRadius: 3, color: Colors.black54),
             ],
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            category.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              shadows: [
+                Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionCard({
+    required Suggestion? suggestion,
+    required double height,
+    EdgeInsets? margin,
+  }) {
+    return Container(
+      height: height,
+      margin: margin ?? EdgeInsets.zero,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE6A919), width: 1),
+      ),
+      child: suggestion != null
+          ? _SuggestionContent(
+              suggestion: suggestion,
+              buildCategoryLabel: _buildCategoryLabel,
+            )
+          : const Center(
+              child: Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
     );
   }
 
@@ -505,6 +760,7 @@ class _BodyContentWidget extends StatelessWidget {
     return Positioned.fill(
       top: 100,
       child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -512,424 +768,45 @@ class _BodyContentWidget extends StatelessWidget {
             WeatherCard(
               weatherData: weatherData,
               isLoading: isLoading,
-              onRefresh: onRefresh,
             ),
             const SizedBox(height: 10),
-
-            // Animated Container Cards
             FadeTransition(
               opacity: cardsAnimation,
               child: Column(
                 children: [
-                  // Top row layout
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Left Column (2/3 width)
                       Expanded(
                         flex: 3,
                         child: Column(
                           children: [
-                            Container(
+                            _buildSuggestionCard(
+                              suggestion: suggestions.isNotEmpty ? suggestions[0] : null,
                               height: 130,
-                              margin: const EdgeInsets.only(
-                                right: 8,
-                                bottom: 8,
-                              ),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.4),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFE6A919),
-                                  width: 1,
-                                ),
-                              ),
-                              child:
-                                  (suggestions.isNotEmpty)
-                                      ? SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            buildCategoryLabel(
-                                              suggestions[0].category,
-                                            ),
-
-                                            const SizedBox(height: 2),
-
-                                            // Crop
-                                            Text.rich(
-                                              TextSpan(
-                                                children: [
-                                                  const TextSpan(
-                                                    text: 'Crop: ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text: suggestions[0].crop,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-
-                                            // Priority
-                                            Text.rich(
-                                              TextSpan(
-                                                children: [
-                                                  const TextSpan(
-                                                    text: 'Priority: ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text:
-                                                        suggestions[0].priority,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 8),
-
-                                            // Main Suggestion Text
-                                            Text(
-                                              suggestions[0].text,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.normal,
-                                                color: Color.fromARGB(
-                                                  255,
-                                                  255,
-                                                  255,
-                                                  255,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                      : const Center(
-                                        child: Text(
-                                          'Loading...',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                      ),
+                              margin: const EdgeInsets.only(right: 8, bottom: 8),
                             ),
-
-                            Container(
+                            _buildSuggestionCard(
+                              suggestion: suggestionsByCategory['care'],
                               height: 100,
                               margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.4),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFE6A919),
-                                  width: 1,
-                                ),
-                              ),
-                              child:
-                                  suggestions.any((s) => s.category == 'care')
-                                      ? SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            buildCategoryLabel('care'),
-                                            const SizedBox(height: 2),
-                                            Text.rich(
-                                              TextSpan(
-                                                children: [
-                                                  const TextSpan(
-                                                    text: 'Crop: ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text:
-                                                        suggestions
-                                                            .firstWhere(
-                                                              (s) =>
-                                                                  s.category ==
-                                                                  'care',
-                                                            )
-                                                            .crop,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Text.rich(
-                                              TextSpan(
-                                                children: [
-                                                  const TextSpan(
-                                                    text: 'Priority: ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text:
-                                                        suggestions
-                                                            .firstWhere(
-                                                              (s) =>
-                                                                  s.category ==
-                                                                  'care',
-                                                            )
-                                                            .priority,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              suggestions
-                                                  .firstWhere(
-                                                    (s) => s.category == 'care',
-                                                  )
-                                                  .text,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.normal,
-                                                color: Color.fromARGB(
-                                                  255,
-                                                  255,
-                                                  255,
-                                                  255,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                      : const Center(
-                                        child: Text(
-                                          'Loading...',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                      ),
                             ),
                           ],
                         ),
                       ),
-
-                      // Right Column (1/3 width)
                       Expanded(
                         flex: 2,
-                        child: Container(
-                          height: 238, // ✅ Increased by 30px
-                          margin: const EdgeInsets.only(left: 0),
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFFE6A919),
-                              width: 1,
-                            ),
-                          ),
-                          child:
-                              suggestions.any((s) => s.category == 'protection')
-                                  ? SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        buildCategoryLabel('protection'),
-
-                                        const SizedBox(height: 2),
-
-                                        Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              const TextSpan(
-                                                text: 'Crop: ',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text:
-                                                    suggestions
-                                                        .firstWhere(
-                                                          (s) =>
-                                                              s.category ==
-                                                              'protection',
-                                                        )
-                                                        .crop,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              const TextSpan(
-                                                text: 'Priority: ',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text:
-                                                    suggestions
-                                                        .firstWhere(
-                                                          (s) =>
-                                                              s.category ==
-                                                              'protection',
-                                                        )
-                                                        .priority,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        const SizedBox(height: 4),
-
-                                        Text(
-                                          suggestions
-                                              .firstWhere(
-                                                (s) =>
-                                                    s.category == 'protection',
-                                              )
-                                              .text,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.normal,
-                                            color: Color.fromARGB(
-                                              255,
-                                              255,
-                                              255,
-                                              255,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  : const Center(
-                                    child: Text(
-                                      'Loading...',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ),
+                        child: _buildSuggestionCard(
+                          suggestion: suggestionsByCategory['protection'],
+                          height: 238,
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 8),
-
-                  // Bottom full-width container
-                  Container(
+                  _buildSuggestionCard(
+                    suggestion: suggestions.length > 3 ? suggestions[3] : null,
                     height: 100,
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFFE6A919),
-                        width: 1,
-                      ),
-                    ),
-                    child:
-                        (suggestions.isNotEmpty)
-                            ? SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  buildCategoryLabel(
-                                    suggestions[3].category,
-                                  ), // Use index or filter by category
-
-                                  const SizedBox(height: 2),
-
-                                  Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        const TextSpan(
-                                          text: 'Crop: ',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: suggestions[3].crop,
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        const TextSpan(
-                                          text: 'Priority: ',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: suggestions[3].priority,
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    suggestions[3].text,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.normal,
-                                      color: Color.fromARGB(255, 255, 255, 255),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                            : const Center(
-                              child: Text(
-                                'Loading...',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
                   ),
                 ],
               ),
@@ -942,7 +819,81 @@ class _BodyContentWidget extends StatelessWidget {
   }
 }
 
-// Curved Clip Path
+class _SuggestionContent extends StatelessWidget {
+  final Suggestion suggestion;
+  final Widget Function(String) buildCategoryLabel;
+
+  const _SuggestionContent({
+    required this.suggestion,
+    required this.buildCategoryLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildCategoryLabel(suggestion.category),
+          const SizedBox(height: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoRow('Crop: ', suggestion.crop),
+              const SizedBox(height: 4),
+              _buildInfoRow('Priority: ', suggestion.priority),
+              const SizedBox(height: 8),
+              Text(
+                suggestion.text,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white,
+                  height: 1.3,
+                  shadows: [
+                    Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+              color: Colors.white,
+              shadows: [
+                Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+              ],
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: Colors.white,
+              shadows: [
+                Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BottomCurveClipper extends CustomClipper<Path> {
   const _BottomCurveClipper();
 
