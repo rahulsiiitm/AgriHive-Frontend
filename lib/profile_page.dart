@@ -5,16 +5,21 @@ import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
-import 'package:my_app/screens/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfilePage extends StatefulWidget {
+  final String? userId;
+  
+  const ProfilePage({super.key, this.userId});
+
   @override
   _ProfilePageState createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _notificationsEnabled = true;
-  String userId = 'user1';
+  late String userId;
   Map<String, dynamic>? profileData;
   final ImagePicker _picker = ImagePicker();
   final String apiBaseUrl = 'http://agrihive-server91.onrender.com';
@@ -28,11 +33,11 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    userId = widget.userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'user1';
     _loadProfileFromCache();
   }
 
   void _loadProfileFromCache() {
-    // Check if we have valid cached data
     if (_cachedProfileData != null && 
         _lastLoadTime != null && 
         DateTime.now().difference(_lastLoadTime!) < _cacheValidDuration) {
@@ -40,7 +45,6 @@ class _ProfilePageState extends State<ProfilePage> {
         profileData = _cachedProfileData;
       });
     } else {
-      // Load from server only if cache is invalid or empty
       _loadProfile();
     }
   }
@@ -80,7 +84,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       
       if (response.statusCode == 200) {
-        // Update cache immediately
         setState(() {
           profileData = {...profileData!, ...updates};
           _cachedProfileData = profileData;
@@ -111,12 +114,32 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _performLogout() async {
+    try {
+      // Clear cached data first
+      _cachedProfileData = null;
+      _lastLoadTime = null;
+      
+      // Clear SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      
+      // Sign out from Firebase - this will automatically trigger AuthWrapper
+      await FirebaseAuth.instance.signOut();
+      
+    } catch (e) {
+      _showSnackBar('Logout failed. Please try again.');
+      print('Logout error: $e');
+    }
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: EdgeInsets.only(bottom: 120, left: 16, right: 16),
       ),
     );
   }
@@ -128,6 +151,7 @@ class _ProfilePageState extends State<ProfilePage> {
       body: profileData == null
           ? Center(child: CircularProgressIndicator(color: Colors.green[600]))
           : RefreshIndicator(
+              color: Colors.green[600],
               onRefresh: () => _loadProfile(forceRefresh: true),
               child: CustomScrollView(
                 slivers: [
@@ -135,9 +159,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   SliverToBoxAdapter(
                     child: Column(
                       children: [
-                        SizedBox(height: 30),
+                        SizedBox(height: 16),
+                        _buildStatsRow(),
+                        SizedBox(height: 20),
                         _buildMenuItems(),
-                        SizedBox(height: 40),
+                        SizedBox(height: 20),
+                        Container(
+                          height: 100,
+                          color: Colors.transparent,
+                        ),
                       ],
                     ),
                   ),
@@ -149,16 +179,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 240,
+      expandedHeight: 200,
       floating: false,
       pinned: true,
       backgroundColor: Colors.grey[100],
+      elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
             color: Colors.grey[100],
             image: DecorationImage(
-              image: AssetImage('assets/images/rice.jpg'), // Add your background image here
+              image: AssetImage('assets/images/rice.jpg'),
               fit: BoxFit.cover,
               colorFilter: ColorFilter.mode(
                 Colors.black.withOpacity(0.3),
@@ -177,58 +208,64 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-            child: SafeArea(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(height: 60),
-                  _buildProfileAvatar(),
-                  SizedBox(height: 16),
-                  Text(
-                    profileData!['name'] ?? 'Name',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          offset: Offset(0, 1),
-                          blurRadius: 3,
-                          color: Colors.black.withOpacity(0.5),
-                        ),
-                      ],
-                    ),
+          child: SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(height: 40),
+                _buildProfileAvatar(),
+                SizedBox(height: 20),
+                Text(
+                  profileData!['name'] ?? 'Name',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
                   ),
-                  SizedBox(height: 2),
+                ),
+                SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.location_on_outlined, 
+                         color: Colors.white.withOpacity(0.9), size: 16),
+                    SizedBox(width: 6),
+                    Text(
+                      profileData!['location'] ?? 'Location',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4),
+                if (profileData!['phone'] != null && profileData!['phone'].toString().isNotEmpty)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.location_on_outlined, 
-                           color: Colors.white.withOpacity(0.9), size: 15),
-                      SizedBox(width: 4),
+                      Icon(Icons.phone_outlined, 
+                           color: Colors.white.withOpacity(0.8), size: 14),
+                      SizedBox(width: 6),
                       Text(
-                        profileData!['location'] ?? 'Location',
+                        profileData!['phone'],
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 16,
-                          shadows: [
-                            Shadow(
-                              offset: Offset(0, 1),
-                              blurRadius: 3,
-                              color: Colors.black.withOpacity(0.5),
-                            ),
-                          ],
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
       ),
-    );
+    ),
+      );    
   }
 
   Widget _buildProfileAvatar() {
@@ -238,23 +275,23 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: EdgeInsets.all(4),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withOpacity(0.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 10,
-                offset: Offset(0, 2),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: Offset(0, 8),
               ),
             ],
           ),
           child: CircleAvatar(
-            radius: 45,
+            radius: 35,
             backgroundColor: Colors.white,
             backgroundImage: profileData!['profilePhoto'] != null
                 ? NetworkImage(profileData!['profilePhoto'])
                 : null,
             child: profileData!['profilePhoto'] == null
-                ? Icon(Icons.person_outline, size: 50, color: Colors.green[600])
+                ? Icon(Icons.person_outline, size: 40, color: Colors.green[600])
                 : null,
           ),
         ),
@@ -278,7 +315,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               child: Icon(
                 Icons.camera_alt_outlined,
-                size: 16,
+                size: 14,
                 color: Colors.green[600],
               ),
             ),
@@ -288,26 +325,86 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildStatsRow() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatCard('Profile', '100%', Icons.person_outline),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: _buildStatCard('Language', profileData?['language'] ?? 'English', Icons.language_outlined),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: _buildStatCard('Status', 'Active', Icons.check_circle_outline),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildStatCard(String title, String value, IconData icon) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.green[600], size: 20),
+          SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[800],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 2),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildMenuItems() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          _buildMenuSection('Profile', [
+          _buildMenuSection('Account', [
             _buildMenuItem(Icons.edit_outlined, 'Edit Profile', _editProfile),
             _buildMenuItem(Icons.notifications_outlined, 'Notifications', _showNotifications),
             _buildMenuItem(Icons.language_outlined, 'Language', _showLanguages),
           ]),
-          SizedBox(height: 20),
+          SizedBox(height: 16),
           _buildMenuSection('Support', [
             _buildMenuItem(Icons.help_outline, 'Help & Support', () {}),
             _buildMenuItem(Icons.info_outline, 'About', () {}),
+            _buildMenuItem(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
           ]),
-          SizedBox(height: 20),
+          SizedBox(height: 16),
           _buildMenuItem(Icons.logout, 'Logout', _showLogout, isDestructive: true),
-          SizedBox(height: 20),
         ],
       ),
     );
@@ -324,7 +421,8 @@ class _ProfilePageState extends State<ProfilePage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              color: Colors.grey[800],
+              letterSpacing: 0.3,
             ),
           ),
         ),
@@ -334,13 +432,31 @@ class _ProfilePageState extends State<ProfilePage> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withOpacity(0.04),
                 blurRadius: 10,
                 offset: Offset(0, 2),
               ),
             ],
           ),
-          child: Column(children: items),
+          child: Column(
+            children: items.asMap().entries.map((entry) {
+              int index = entry.key;
+              Widget item = entry.value;
+              return Column(
+                children: [
+                  item,
+                  if (index < items.length - 1)
+                    Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: Colors.grey[200],
+                      indent: 52,
+                      endIndent: 16,
+                    ),
+                ],
+              );
+            }).toList(),
+          ),
         ),
       ],
     );
@@ -349,31 +465,31 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
     return Container(
       decoration: BoxDecoration(
-        color: isDestructive ? Colors.red.withOpacity(0.02) : Colors.white,
-        borderRadius: BorderRadius.circular(isDestructive ? 16 : 0),
+        color: isDestructive ? Colors.red.withOpacity(0.03) : Colors.white,
+        borderRadius: BorderRadius.circular(isDestructive ? 20 : 0),
         boxShadow: isDestructive ? [
           BoxShadow(
-            color: Colors.red.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+            color: Colors.red.withOpacity(0.08),
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ] : null,
       ),
       margin: isDestructive ? EdgeInsets.zero : null,
       child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
-          padding: EdgeInsets.all(10),
+          padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isDestructive 
                 ? Colors.red.withOpacity(0.1) 
                 : Colors.green.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             icon,
             color: isDestructive ? Colors.red[600] : Colors.green[600],
-            size: 20,
+            size: 18,
           ),
         ),
         title: Text(
@@ -381,17 +497,18 @@ class _ProfilePageState extends State<ProfilePage> {
           style: TextStyle(
             fontWeight: FontWeight.w500,
             color: isDestructive ? Colors.red[600] : Colors.grey[800],
-            fontSize: 16,
+            fontSize: 15,
+            letterSpacing: 0.1,
           ),
         ),
         trailing: Icon(
           Icons.arrow_forward_ios,
-          size: 16,
+          size: 14,
           color: Colors.grey[400],
         ),
         onTap: onTap,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(isDestructive ? 16 : 0),
+          borderRadius: BorderRadius.circular(isDestructive ? 20 : 0),
         ),
       ),
     );
@@ -405,7 +522,11 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Edit Profile'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Edit Profile',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -413,34 +534,51 @@ class _ProfilePageState extends State<ProfilePage> {
               controller: nameController,
               decoration: InputDecoration(
                 labelText: 'Name',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.green[600]!),
+                ),
               ),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 16),
             TextField(
               controller: locationController,
               decoration: InputDecoration(
                 labelText: 'Location',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.green[600]!),
+                ),
               ),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 16),
             TextField(
               controller: phoneController,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
                 labelText: 'Phone',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.green[600]!),
+                ),
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-            child: Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
             onPressed: () => Navigator.pop(context),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[600],
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: Text('Save'),
             onPressed: () async {
               Navigator.pop(context);
@@ -479,7 +617,7 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text('Notifications', style: TextStyle(fontWeight: FontWeight.w600)),
           content: SwitchListTile(
             title: Text('Push Notifications'),
@@ -489,8 +627,13 @@ class _ProfilePageState extends State<ProfilePage> {
             onChanged: (value) => setState(() => _notificationsEnabled = value),
           ),
           actions: [
-            TextButton(
-              child: Text('Done', style: TextStyle(color: Colors.green[600])),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[600],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text('Done'),
               onPressed: () => Navigator.pop(context),
             ),
           ],
@@ -506,7 +649,7 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Select Language', style: TextStyle(fontWeight: FontWeight.w600)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -536,26 +679,24 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Logout'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Logout', style: TextStyle(fontWeight: FontWeight.w600)),
         content: Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            child: Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
             onPressed: () => Navigator.pop(context),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: Text('Logout'),
             onPressed: () {
               Navigator.pop(context);
-              // Clear cache on logout
-              _cachedProfileData = null;
-              _lastLoadTime = null;
-              // Navigate to login page and remove all previous routes
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => LoginScreen()),
-                (route) => false,
-              );
+              _performLogout();
             },
           ),
         ],

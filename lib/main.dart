@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
 import 'package:my_app/home.dart';
 import 'package:my_app/profile_page.dart';
 
@@ -19,9 +18,6 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-
-    //  WidgetsFlutterBinding.ensureInitialized();
-    // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     return MaterialApp(
       title: 'AgriHive App',
       debugShowCheckedModeBanner: false,
@@ -36,15 +32,19 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
+    return StreamBuilder<User?>(
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(body: Center(child: CircularProgressIndicator()));
+          return Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Colors.green[600]),
+            ),
+          );
         }
 
-        if (snapshot.hasData) {
-          final user = snapshot.data as User;
+        if (snapshot.hasData && snapshot.data != null) {
+          final user = snapshot.data!;
           return AgriHiveNavWrapper(userId: user.uid);
         } else {
           return LoginScreen();
@@ -56,7 +56,7 @@ class AuthWrapper extends StatelessWidget {
 
 class AgriHiveNavWrapper extends StatefulWidget {
   final String userId;
-  const AgriHiveNavWrapper({super.key, required this.userId});
+  const AgriHiveNavWrapper({Key? key, required this.userId}) : super(key: key);
 
   @override
   _AgriHiveNavWrapperState createState() => _AgriHiveNavWrapperState();
@@ -64,7 +64,6 @@ class AgriHiveNavWrapper extends StatefulWidget {
 
 class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
   int _selectedIndex = 0;
-
   late final List<Widget> _pages;
 
   @override
@@ -75,7 +74,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
       PlantationManagementPage(userId: widget.userId),
       SizedBox(), // FAB placeholder
       IoTPage(),
-      ProfilePage(),
+      ProfilePage(userId: widget.userId), // Pass userId to ProfilePage
     ];
   }
 
@@ -145,10 +144,9 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                     children: [
                       Icon(
                         _icons[adjustedIndex],
-                        color:
-                            _selectedIndex == index
-                                ? Color.fromARGB(255, 120, 255, 165)
-                                : Color(0xFFFFFFFF),
+                        color: _selectedIndex == index
+                            ? Color.fromARGB(255, 120, 255, 165)
+                            : Color(0xFFFFFFFF),
                       ),
                       SizedBox(height: 4),
                       Text(
@@ -156,10 +154,9 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                         style: TextStyle(
                           fontFamily: 'lufga',
                           fontSize: 8,
-                          color:
-                              _selectedIndex == index
-                                  ? Color(0xFF4B9834)
-                                  : Color(0xFFA0A0A0),
+                          color: _selectedIndex == index
+                              ? Color(0xFF4B9834)
+                              : Color(0xFFA0A0A0),
                         ),
                       ),
                     ],
@@ -173,12 +170,6 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
     );
   }
 }
-
-// Dummy Pages (same as before)
-// class ProfilePage extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) => Center(child: Text('Profile Page'));
-// }
 
 class IoTPage extends StatelessWidget {
   @override
