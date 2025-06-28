@@ -504,18 +504,24 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
               data['suggestion']['body'] ?? 'No suggestion available';
           isLoading = false;
         });
+      } else if (response.statusCode == 404) {
+        final error = json.decode(response.body)['error'];
+        setState(() {
+          suggestionHeading = 'No Crops Found';
+          dailySuggestion = error ?? 'No crops added yet. Please add crops.';
+          isLoading = false;
+        });
       } else {
         setState(() {
           suggestionHeading = 'Error';
-          dailySuggestion =
-              'Server Error (${response.statusCode}): ${response.body}';
+          dailySuggestion = 'Unexpected Error (${response.statusCode})';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
         suggestionHeading = 'Network Error';
-        dailySuggestion = 'Network Error: ${e.toString()}';
+        dailySuggestion = 'Could not fetch suggestions. Please try again.';
         isLoading = false;
       });
     }
@@ -817,11 +823,6 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                               // Heading
                               Row(
                                 children: [
-                                  // const Icon(
-                                  //   Icons.light,
-                                  //   color: Colors.white70,
-                                  //   size: 18,
-                                  // ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
@@ -1009,7 +1010,32 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
     }
 
     if (crops.isEmpty) {
-      return Center(child: Text('No crops found for $userId'));
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.grass, color: const Color.fromARGB(255, 221, 255, 222), size: 36),
+              SizedBox(height: 8),
+              Text(
+                'No crops found',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: const Color.fromARGB(255, 255, 255, 255),
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Start by adding your first crop to get suggestions and tracking!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: const Color.fromARGB(255, 255, 255, 255)),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -1147,7 +1173,7 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
                                         style: TextStyle(
                                           color: Colors.yellow[500],
                                           fontFamily: 'lufga',
-                                          fontSize: 11
+                                          fontSize: 11,
                                         ),
                                       ),
                                       IconButton(

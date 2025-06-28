@@ -2,15 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
+// import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+// ignore: depend_on_referenced_packages
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfilePage extends StatefulWidget {
   final String? userId;
-  
+
   const ProfilePage({super.key, this.userId});
 
   @override
@@ -21,9 +22,9 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _notificationsEnabled = true;
   late String userId;
   Map<String, dynamic>? profileData;
-  final ImagePicker _picker = ImagePicker();
-  final String apiBaseUrl = 'http://agrihive-server91.onrender.com';
-  
+  // final ImagePicker _picker = ImagePicker();
+  final String apiBaseUrl = 'https://agrihive-server91.onrender.com';
+
   // Cache variables
   static Map<String, dynamic>? _cachedProfileData;
   static DateTime? _lastLoadTime;
@@ -38,8 +39,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _loadProfileFromCache() {
-    if (_cachedProfileData != null && 
-        _lastLoadTime != null && 
+    if (_cachedProfileData != null &&
+        _lastLoadTime != null &&
         DateTime.now().difference(_lastLoadTime!) < _cacheValidDuration) {
       setState(() {
         profileData = _cachedProfileData;
@@ -49,64 +50,96 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _loadProfile({bool forceRefresh = false}) async {
-    if (_isLoading && !forceRefresh) return;
-    
-    setState(() {
-      _isLoading = true;
-    });
+Future<void> _loadProfile({bool forceRefresh = false}) async {
+  if (_isLoading && !forceRefresh) return;
 
-    try {
-      final response = await http.get(Uri.parse('$apiBaseUrl/get_farmer_profile?userId=$userId'));
-      if (response.statusCode == 200) {
-        final newProfileData = json.decode(response.body)['profile'];
-        setState(() {
-          profileData = newProfileData;
-          _cachedProfileData = newProfileData;
-          _lastLoadTime = DateTime.now();
-        });
-      }
-    } catch (e) {
-      _showSnackBar('Failed to load profile');
-    } finally {
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/get_farmer_profile?userId=$userId'),
+    );
+
+    if (response.statusCode == 200) {
+      final newProfileData = json.decode(response.body)['profile'];
       setState(() {
-        _isLoading = false;
+        profileData = newProfileData;
+        _cachedProfileData = newProfileData;
+        _lastLoadTime = DateTime.now();
+      });
+    } else if (response.statusCode == 404) {
+      // 👇 Just show empty profile with default values
+      setState(() {
+        profileData = {
+          'name': 'No data',
+          'location': 'No data',
+          'phone': '',
+          'language': 'English',
+          'profilePhoto': null,
+        };
       });
     }
+  } catch (e) {
+    _showSnackBar('Failed to load profile');
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
 
-  Future<bool> updateProfile(Map<String, dynamic> updates) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/update_farmer_profile'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'userId': userId, 'updates': updates}),
-      );
-      
-      if (response.statusCode == 200) {
-        setState(() {
-          profileData = {...profileData!, ...updates};
-          _cachedProfileData = profileData;
-          _lastLoadTime = DateTime.now();
-        });
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
+
+Future<bool> updateProfile(Map<String, dynamic> updates) async {
+  try {
+    print('🔵 Sending update request for userId: $userId');
+    print('🔵 Updates: $updates');
+
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/update_farmer_profile'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'userId': userId, 'updates': updates}),
+    );
+
+    print('🟡 Status Code: ${response.statusCode}');
+    print('🟡 Response Body: ${response.body}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      setState(() {
+        profileData = {...?profileData, ...updates};
+        _cachedProfileData = profileData;
+        _lastLoadTime = DateTime.now();
+      });
+      return true;
+    } else {
+      final error = json.decode(response.body);
+      print('🔴 Server error: $error');
     }
+
+    return false;
+  } catch (e) {
+    print('🔴 Exception in updateProfile: $e');
+    return false;
   }
+}
+
 
   Future<bool> uploadPhoto(File imageFile) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse('$apiBaseUrl/upload_profile_photo'));
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/upload_profile_photo'),
+      );
       request.fields['userId'] = userId;
       final mimeType = lookupMimeType(imageFile.path) ?? 'image/jpeg';
-      request.files.add(await http.MultipartFile.fromPath(
-        'photo',
-        imageFile.path,
-        contentType: MediaType.parse(mimeType),
-      ));
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
       final response = await request.send();
       return response.statusCode == 200;
     } catch (e) {
@@ -119,14 +152,13 @@ class _ProfilePageState extends State<ProfilePage> {
       // Clear cached data first
       _cachedProfileData = null;
       _lastLoadTime = null;
-      
+
       // Clear SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      
+
       // Sign out from Firebase - this will automatically trigger AuthWrapper
       await FirebaseAuth.instance.signOut();
-      
     } catch (e) {
       _showSnackBar('Logout failed. Please try again.');
       print('Logout error: $e');
@@ -148,38 +180,36 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: profileData == null
-          ? Center(child: CircularProgressIndicator(color: Colors.green[600]))
-          : RefreshIndicator(
-              color: Colors.green[600],
-              onRefresh: () => _loadProfile(forceRefresh: true),
-              child: CustomScrollView(
-                slivers: [
-                  _buildSliverAppBar(),
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        SizedBox(height: 16),
-                        _buildStatsRow(),
-                        SizedBox(height: 20),
-                        _buildMenuItems(),
-                        SizedBox(height: 20),
-                        Container(
-                          height: 100,
-                          color: Colors.transparent,
-                        ),
-                      ],
+      body:
+          profileData == null
+              ? Center(
+                child: CircularProgressIndicator(color: Colors.green[600]),
+              )
+              : RefreshIndicator(
+                color: Colors.green[600],
+                onRefresh: () => _loadProfile(forceRefresh: true),
+                child: CustomScrollView(
+                  slivers: [
+                    _buildSliverAppBar(),
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          SizedBox(height: 16),
+                          _buildMenuItems(),
+                          SizedBox(height: 20),
+                          Container(height: 100, color: Colors.transparent),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
     );
   }
 
   Widget _buildSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 200,
+      expandedHeight: 260,
       floating: false,
       pinned: true,
       backgroundColor: Colors.grey[100],
@@ -202,70 +232,83 @@ class _ProfilePageState extends State<ProfilePage> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.4),
-                ],
+                colors: [Colors.transparent, Colors.black.withOpacity(0.4)],
               ),
             ),
-          child: SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(height: 40),
-                _buildProfileAvatar(),
-                SizedBox(height: 20),
-                Text(
-                  profileData!['name'] ?? 'Name',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.location_on_outlined, 
-                         color: Colors.white.withOpacity(0.9), size: 16),
-                    SizedBox(width: 6),
-                    Text(
-                      profileData!['location'] ?? 'Location',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
-                      ),
+            child: SafeArea(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(height: 40),
+                  _buildProfileAvatar(),
+                  SizedBox(height: 20),
+                  Text(
+                    profileData!['name'] ?? 'Name',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
                     ),
-                  ],
-                ),
-                SizedBox(height: 4),
-                if (profileData!['phone'] != null && profileData!['phone'].toString().isNotEmpty)
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis, // ✅ Prevent overflow
+                    maxLines: 1,
+                  ),
+
+                  SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.phone_outlined, 
-                           color: Colors.white.withOpacity(0.8), size: 14),
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: Colors.white.withOpacity(0.9),
+                        size: 16,
+                      ),
                       SizedBox(width: 6),
-                      Text(
-                        profileData!['phone'],
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
+                      Flexible(
+                        child: Text(
+                          profileData!['location'] ?? 'Location',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          overflow: TextOverflow.ellipsis, // ✅ Prevent overflow
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     ],
                   ),
-              ],
+                  SizedBox(height: 4),
+                  if (profileData!['phone'] != null &&
+                      profileData!['phone'].toString().isNotEmpty)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.phone_outlined,
+                          color: Colors.white.withOpacity(0.8),
+                          size: 14,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          profileData!['phone'],
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-      );    
+    );
   }
 
   Widget _buildProfileAvatar() {
@@ -287,19 +330,35 @@ class _ProfilePageState extends State<ProfilePage> {
           child: CircleAvatar(
             radius: 35,
             backgroundColor: Colors.white,
-            backgroundImage: profileData!['profilePhoto'] != null
-                ? NetworkImage(profileData!['profilePhoto'])
-                : null,
-            child: profileData!['profilePhoto'] == null
-                ? Icon(Icons.person_outline, size: 40, color: Colors.green[600])
-                : null,
+            child:
+                profileData!['profilePhoto'] != null
+                    ? ClipOval(
+                      child: Image.network(
+                        profileData!['profilePhoto'],
+                        fit: BoxFit.cover,
+                        width: 70,
+                        height: 70,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.person_outline,
+                            size: 40,
+                            color: Colors.green[600],
+                          );
+                        },
+                      ),
+                    )
+                    : Icon(
+                      Icons.person_outline,
+                      size: 40,
+                      color: Colors.green[600],
+                    ),
           ),
         ),
         Positioned(
           bottom: 0,
           right: 0,
           child: GestureDetector(
-            onTap: _editPhoto,
+            // onTap: _editPhoto,
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -325,68 +384,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildStatsRow() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard('Profile', '100%', Icons.person_outline),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard('Language', profileData?['language'] ?? 'English', Icons.language_outlined),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard('Status', 'Active', Icons.check_circle_outline),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon) {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.green[600], size: 20),
-          SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 2),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMenuItems() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
@@ -394,17 +391,35 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           _buildMenuSection('Account', [
             _buildMenuItem(Icons.edit_outlined, 'Edit Profile', _editProfile),
-            _buildMenuItem(Icons.notifications_outlined, 'Notifications', _showNotifications),
+            _buildMenuItem(
+              Icons.notifications_outlined,
+              'Notifications',
+              _showNotifications,
+            ),
             _buildMenuItem(Icons.language_outlined, 'Language', _showLanguages),
           ]),
           SizedBox(height: 16),
           _buildMenuSection('Support', [
-            _buildMenuItem(Icons.help_outline, 'Help & Support', () {}),
-            _buildMenuItem(Icons.info_outline, 'About', () {}),
-            _buildMenuItem(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
+            _buildMenuItem(
+              Icons.help_outline,
+              'Help & Support',
+              _showSupportDialog,
+            ),
+            _buildMenuItem(Icons.info_outline, 'About', _showAboutDialog),
+            _buildMenuItem(
+              Icons.privacy_tip_outlined,
+              'Privacy Policy',
+              _showPrivacyDialog,
+            ),
           ]),
+
           SizedBox(height: 16),
-          _buildMenuItem(Icons.logout, 'Logout', _showLogout, isDestructive: true),
+          _buildMenuItem(
+            Icons.logout,
+            'Logout',
+            _showLogout,
+            isDestructive: true,
+          ),
         ],
       ),
     );
@@ -439,41 +454,50 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
           child: Column(
-            children: items.asMap().entries.map((entry) {
-              int index = entry.key;
-              Widget item = entry.value;
-              return Column(
-                children: [
-                  item,
-                  if (index < items.length - 1)
-                    Divider(
-                      height: 1,
-                      thickness: 0.5,
-                      color: Colors.grey[200],
-                      indent: 52,
-                      endIndent: 16,
-                    ),
-                ],
-              );
-            }).toList(),
+            children:
+                items.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  Widget item = entry.value;
+                  return Column(
+                    children: [
+                      item,
+                      if (index < items.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: Colors.grey[200],
+                          indent: 52,
+                          endIndent: 16,
+                        ),
+                    ],
+                  );
+                }).toList(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+  Widget _buildMenuItem(
+    IconData icon,
+    String title,
+    VoidCallback onTap, {
+    bool isDestructive = false,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: isDestructive ? Colors.red.withOpacity(0.03) : Colors.white,
         borderRadius: BorderRadius.circular(isDestructive ? 20 : 0),
-        boxShadow: isDestructive ? [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.08),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ] : null,
+        boxShadow:
+            isDestructive
+                ? [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ]
+                : null,
       ),
       margin: isDestructive ? EdgeInsets.zero : null,
       child: ListTile(
@@ -481,9 +505,10 @@ class _ProfilePageState extends State<ProfilePage> {
         leading: Container(
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isDestructive 
-                ? Colors.red.withOpacity(0.1) 
-                : Colors.green.withOpacity(0.1),
+            color:
+                isDestructive
+                    ? Colors.red.withOpacity(0.1)
+                    : Colors.green.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
@@ -515,130 +540,163 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _editProfile() {
-    final nameController = TextEditingController(text: profileData?['name'] ?? '');
-    final locationController = TextEditingController(text: profileData?['location'] ?? '');
-    final phoneController = TextEditingController(text: profileData?['phone'] ?? '');
+    final nameController = TextEditingController(
+      text: profileData?['name'] ?? '',
+    );
+    final locationController = TextEditingController(
+      text: profileData?['location'] ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: profileData?['phone'] ?? '',
+    );
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Edit Profile',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.green[600]!),
-                ),
-              ),
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            SizedBox(height: 16),
-            TextField(
-              controller: locationController,
-              decoration: InputDecoration(
-                labelText: 'Location',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.green[600]!),
-                ),
-              ),
+            title: Text(
+              'Edit Profile',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
             ),
-            SizedBox(height: 16),
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'Phone',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.green[600]!),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.green[600]!),
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(height: 16),
+                TextField(
+                  controller: locationController,
+                  decoration: InputDecoration(
+                    labelText: 'Location',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.green[600]!),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.green[600]!),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            onPressed: () => Navigator.pop(context),
+            actions: [
+              TextButton(
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[600],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text('Save'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  final updated = await updateProfile({
+                    'name': nameController.text.trim(),
+                    'location': locationController.text.trim(),
+                    'phone': phoneController.text.trim(),
+                  });
+                  if (updated) {
+                    _showSnackBar('Profile updated successfully!');
+                  } else {
+                    _showSnackBar('Failed to update profile');
+                  }
+                },
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[600],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text('Save'),
-            onPressed: () async {
-              Navigator.pop(context);
-              final updated = await updateProfile({
-                'name': nameController.text.trim(),
-                'location': locationController.text.trim(),
-                'phone': phoneController.text.trim(),
-              });
-              if (updated) {
-                _showSnackBar('Profile updated successfully!');
-              } else {
-                _showSnackBar('Failed to update profile');
-              }
-            },
-          ),
-        ],
-      ),
     );
   }
 
-  void _editPhoto() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      final uploaded = await uploadPhoto(File(pickedFile.path));
-      if (uploaded) {
-        _loadProfile(forceRefresh: true);
-        _showSnackBar('Profile photo updated!');
-      } else {
-        _showSnackBar('Photo upload failed');
-      }
-    }
-  }
+  // void _editPhoto() async {
+  //   final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+  //   if (pickedFile != null) {
+  //     final uploaded = await uploadPhoto(File(pickedFile.path));
+  //     if (uploaded) {
+  //       _loadProfile(forceRefresh: true);
+  //       _showSnackBar('Profile photo updated!');
+  //     } else {
+  //       _showSnackBar('Photo upload failed');
+  //     }
+  //   }
+  // }
 
   void _showNotifications() {
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Notifications', style: TextStyle(fontWeight: FontWeight.w600)),
-          content: SwitchListTile(
-            title: Text('Push Notifications'),
-            subtitle: Text('Receive weather alerts and crop advisories'),
-            value: _notificationsEnabled,
-            activeColor: Colors.green[600],
-            onChanged: (value) => setState(() => _notificationsEnabled = value),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  title: Text(
+                    'Notifications',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  content: SwitchListTile(
+                    title: Text('Push Notifications'),
+                    subtitle: Text(
+                      'Receive weather alerts and crop advisories',
+                    ),
+                    value: _notificationsEnabled,
+                    activeColor: Colors.green[600],
+                    onChanged:
+                        (value) =>
+                            setState(() => _notificationsEnabled = value),
+                  ),
+                  actions: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[600],
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text('Done'),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
           ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green[600],
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text('Done'),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -648,59 +706,145 @@ class _ProfilePageState extends State<ProfilePage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Select Language', style: TextStyle(fontWeight: FontWeight.w600)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: languages.map((language) => RadioListTile<String>(
-            title: Text(language),
-            value: language,
-            groupValue: selectedLanguage,
-            activeColor: Colors.green[600],
-            onChanged: (value) async {
-              Navigator.pop(context);
-              await updateProfile({'language': value});
-              _showSnackBar('Language changed to $value');
-            },
-          )).toList(),
-        ),
-        actions: [
-          TextButton(
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            onPressed: () => Navigator.pop(context),
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Select Language',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children:
+                  languages
+                      .map(
+                        (language) => RadioListTile<String>(
+                          title: Text(language),
+                          value: language,
+                          groupValue: selectedLanguage,
+                          activeColor: Colors.green[600],
+                          onChanged: (value) async {
+                            Navigator.pop(context);
+                            await updateProfile({'language': value});
+                            _showSnackBar('Language changed to $value');
+                          },
+                        ),
+                      )
+                      .toList(),
+            ),
+            actions: [
+              TextButton(
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Logout', style: TextStyle(fontWeight: FontWeight.w600)),
-        content: Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[600],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Text('Logout'),
-            onPressed: () {
-              Navigator.pop(context);
-              _performLogout();
-            },
+            title: Text(
+              'Logout',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            content: Text('Are you sure you want to logout?'),
+            actions: [
+              TextButton(
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[600],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text('Logout'),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _performLogout();
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+    );
+  }
+
+  void _showSupportDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Help & Support'),
+            content: Text(
+              'For any help, feel free to contact the developer:\n\n'
+              '📧 Email: rahulsharma.hps@gmail.com\n'
+              '📞 Phone: +91-6396165371',
+            ),
+            actions: [
+              TextButton(
+                child: Text('Close'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('About AgriHive'),
+            content: Text(
+              'AgriHive is an AI-powered farming assistant developed as a hobby project.\n\n'
+              '👨‍💻 Developer: Rahul Sharma\n'
+              '🌱 Goal: To support farmers with disease detection, crop advisory, and management tools.\n\n',
+            ),
+            actions: [
+              TextButton(
+                child: Text('Close'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Privacy Policy'),
+            content: Text(
+              'There is no formal privacy policy. Just don’t misuse the app 😄',
+            ),
+            actions: [
+              TextButton(
+                child: Text('Got it'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
     );
   }
 }
