@@ -1,6 +1,6 @@
 # AgriHive - Agricultural Advisory System
 
-![just a banner](<Banner.png>)
+![just a banner](<assets/images/images_readme/Banner.png>)
 
 A comprehensive mobile application designed to assist farmers with AI-powered plant disease detection, crop management, weather-based farming suggestions, and an intelligent agricultural chatbot.
 
@@ -275,21 +275,21 @@ Get personalized farming suggestions based on crops and weather.
   <tr>
     <td width="50%" align="center">
       <strong>Home Screen</strong><br/>
-      <img src="home.jpeg" width="300"/>
+      <img src="assets/images/images_readme/home.jpeg" width="300"/>
     </td>
     <td width="50%" align="center">
       <strong>Chat Interface</strong><br/>
-      <img src="chat.jpeg" width="300"/>
+      <img src="assets/images/images_readme/chat.jpeg" width="300"/>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <strong>Crop Management</strong><br/>
-      <img src="manage.jpeg" width="300"/>
+      <img src="assets/images/images_readme/manage.jpeg" width="300"/>
     </td>
     <td width="50%" align="center">
       <strong>Profile Management</strong><br/>
-      <img src="profile.jpeg" width="300"/>
+      <img src="assets/images/images_readme/profile.jpeg" width="300"/>
     </td>
   </tr>
 </table>
