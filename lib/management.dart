@@ -243,24 +243,26 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
   }
 
   Future<void> loadCrops() async {
-    // Initialize cache first (loads from persistent storage if available)
+    // 1. Initialize cache
     await CropCache.initializeCache(userId);
 
-    // Check if data is already available in cache
+    // 2. Load cached data first (Fast UI)
     final cachedCrops = await CropCache.getCachedCrops(userId);
     if (cachedCrops != null && cachedCrops.isNotEmpty) {
-      setState(() {
-        crops = cachedCrops;
-        isLoading = false;
-      });
-
-      if (kDebugMode) {
-        print('Loaded ${cachedCrops.length} crops from cache');
+      if (mounted) {
+        setState(() {
+          crops = cachedCrops;
+        });
       }
-      return;
+      if (kDebugMode) {
+        print(
+          'Loaded ${cachedCrops.length} crops from cache. Fetching fresh data in background...',
+        );
+      }
+    } else {
+      if (mounted) setState(() => isLoading = true);
     }
 
-    // Only fetch from API if no cache available
     await fetchCrops();
   }
 
@@ -271,17 +273,23 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
   }
 
   Future<void> fetchCrops() async {
+    if (!mounted) return; // 1. Check at start
+
     try {
-      setState(() {
-        isLoading = true;
-        errorMessage = '';
-        isOnline = true;
-      });
+      // Only show loading if we don't have data yet
+      if (crops.isEmpty) {
+        setState(() {
+          isLoading = true;
+          errorMessage = '';
+          isOnline = true;
+        });
+      }
 
       if (userId.isEmpty ||
           userId == '0' ||
           userId == 'null' ||
           userId == 'undefined') {
+        if (!mounted) return;
         setState(() {
           errorMessage = 'Invalid user ID';
           isLoading = false;
@@ -298,6 +306,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           )
           .timeout(Duration(seconds: 30));
 
+      if (!mounted) return; // 2. CRITICAL CHECK after HTTP await
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
 
@@ -310,6 +320,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           // Cache the results with persistent storage
           await CropCache.setCachedCrops(userId, cropsList);
 
+          if (!mounted) return; // 3. CRITICAL CHECK after Cache await
+
           setState(() {
             crops = cropsList;
             isLoading = false;
@@ -319,11 +331,14 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
             print('Fetched and cached ${cropsList.length} crops from API');
           }
         } else {
+          await CropCache.setCachedCrops(userId, []);
+
+          if (!mounted) return; // 4. CRITICAL CHECK
+
           setState(() {
             crops = [];
             isLoading = false;
           });
-          await CropCache.setCachedCrops(userId, []);
         }
       } else if (response.statusCode == 400) {
         final Map<String, dynamic> errorData = json.decode(response.body);
@@ -338,6 +353,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return; // 5. Check in catch block before UI updates
+
       setState(() {
         errorMessage = 'Network error: Unable to connect to server';
         isLoading = false;
@@ -346,19 +363,14 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
 
       // Try to load from cache when offline
       final cachedCrops = await CropCache.getCachedCrops(userId);
+
+      if (!mounted) return; // 6. Check after async cache retrieval
+
       if (cachedCrops != null && cachedCrops.isNotEmpty) {
         setState(() {
           crops = cachedCrops;
           errorMessage = 'Showing cached data (Offline)';
         });
-
-        if (kDebugMode) {
-          print('Network error, loaded ${cachedCrops.length} crops from cache');
-        }
-      }
-
-      if (kDebugMode) {
-        print('Error fetching crops: $e');
       }
     }
   }
@@ -487,14 +499,19 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
   }
 
   Future<void> fetchDailySuggestion() async {
+    if (!mounted) return; // 1. Check at start
+
     setState(() => isLoading = true);
+
     try {
       final response = await http.get(
         Uri.parse(
-          'http://agrihive-server91.onrender.com/getDailySuggestion?userId=$userId',
+          'https://agrihive-server91.onrender.com/getDailySuggestion?userId=$userId',
         ),
         headers: {'Accept': 'application/json', 'User-Agent': 'Flutter App'},
       );
+
+      if (!mounted) return; // 2. CRITICAL CHECK after await
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -519,6 +536,8 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return; // 3. Check in catch block
+
       setState(() {
         suggestionHeading = 'Network Error';
         dailySuggestion = 'Could not fetch suggestions. Please try again.';
@@ -1016,7 +1035,11 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.grass, color: const Color.fromARGB(255, 221, 255, 222), size: 36),
+              Icon(
+                Icons.grass,
+                color: const Color.fromARGB(255, 221, 255, 222),
+                size: 36,
+              ),
               SizedBox(height: 8),
               Text(
                 'No crops found',
@@ -1030,7 +1053,10 @@ class _PlantationManagementPageState extends State<PlantationManagementPage> {
               Text(
                 'Start by adding your first crop to get suggestions and tracking!',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: const Color.fromARGB(255, 255, 255, 255)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: const Color.fromARGB(255, 255, 255, 255),
+                ),
               ),
             ],
           ),

@@ -45,27 +45,32 @@ class Suggestion {
 class _CategoryData {
   final IconData icon;
   final Color color;
-  
+
   const _CategoryData(this.icon, this.color);
 }
 
 // Constants
 class _Constants {
-  static const Duration cacheValidDuration = Duration(minutes: 30);
-  static const Duration headerAnimationDuration = Duration(milliseconds: 800); // Slower
-  static const Duration cardsAnimationDuration = Duration(milliseconds: 600);   // Slower
-  static const Duration animationDelay = Duration(milliseconds: 500);           // Longer delay
-  static const Duration apiTimeout = Duration(seconds: 15);
-  
-  // Cache keys
+  // 1. Reduced cache duration (so it checks for updates more often)
+  static const Duration cacheValidDuration = Duration(minutes: 5);
+
+  static const Duration headerAnimationDuration = Duration(milliseconds: 800);
+  static const Duration cardsAnimationDuration = Duration(milliseconds: 600);
+  static const Duration animationDelay = Duration(milliseconds: 500);
+
+  // 2. INCREASED TIMEOUT to 60 seconds (AI needs time!)
+  static const Duration apiTimeout = Duration(seconds: 60);
+
+  // Cache keys...
   static const String weatherCacheKey = 'cached_weather_data';
   static const String lastFetchTimeKey = 'last_weather_fetch_time';
   static const String suggestionsCacheKey = 'cached_suggestions_data';
-  static const String lastSuggestionsFetchTimeKey = 'last_suggestions_fetch_time';
+  static const String lastSuggestionsFetchTimeKey =
+      'last_suggestions_fetch_time';
   static const String userNameCacheKey = 'cached_user_name';
   static const String lastUserFetchTimeKey = 'last_user_fetch_time';
-  
-  // Category configuration
+
+  // Category config...
   static const Map<String, _CategoryData> categoryConfig = {
     'irrigation': _CategoryData(Icons.water_drop, Colors.blue),
     'pest_control': _CategoryData(Icons.bug_report, Colors.red),
@@ -108,10 +113,11 @@ class _CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final timestampString = prefs.getString(timestampKey);
-      
+
       if (timestampString != null) {
         final timestamp = DateTime.parse(timestampString);
-        return DateTime.now().difference(timestamp) < _Constants.cacheValidDuration;
+        return DateTime.now().difference(timestamp) <
+            _Constants.cacheValidDuration;
       }
     } catch (e) {
       debugPrint('Error checking cache validity for key $timestampKey: $e');
@@ -123,39 +129,44 @@ class _CacheService {
 class _SuggestionsService {
   static Future<List<Suggestion>> fetchSuggestions(String userId) async {
     try {
+      debugPrint('🌱 Fetching suggestions for $userId...'); // Debug log
+
       final response = await http
           .get(
-            Uri.parse('https://agrihive-server91.onrender.com/getSuggestions?userId=$userId'),
+            Uri.parse(
+              'https://agrihive-server91.onrender.com/getSuggestions?userId=$userId',
+            ),
             headers: {'Content-Type': 'application/json'},
           )
-          .timeout(_Constants.apiTimeout);
+          .timeout(_Constants.apiTimeout); // Uses new 60s timeout
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        
+
         if (jsonData['success'] == true && jsonData['suggestions'] != null) {
+          debugPrint('✅ Suggestions fetched successfully');
           return _parseSuggestions(jsonData['suggestions']);
         } else {
-          throw Exception('Invalid response format');
+          throw Exception('Invalid response format or success=false');
         }
       } else {
-        throw HttpException('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        throw HttpException('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('❌ Error fetching suggestions: $e');
-      rethrow;
+      rethrow; // Pass error up to show fallback
     }
   }
 
   static List<Suggestion> _parseSuggestions(Map<String, dynamic> data) {
     final suggestions = <Suggestion>[];
-    
+
     for (var key in ['first', 'second', 'third', 'fourth']) {
       if (data.containsKey(key)) {
         suggestions.add(Suggestion.fromJson(data[key]));
       }
     }
-    
+
     return suggestions;
   }
 
@@ -165,25 +176,27 @@ class _SuggestionsService {
         category: 'irrigation',
         crop: 'Wheat',
         priority: 'High',
-        text: 'Water your wheat crop early morning. Soil moisture should be maintained at 70%.',
+        text:
+            'Water your wheat crop early morning. Soil moisture should be maintained at 70%.',
       ),
       const Suggestion(
         category: 'care',
-        crop: 'Rice', 
+        crop: 'Rice',
         priority: 'Medium',
         text: 'Apply organic fertilizer. Monitor for any yellowing of leaves.',
       ),
       const Suggestion(
         category: 'protection',
         crop: 'Tomato',
-        priority: 'High', 
+        priority: 'High',
         text: 'Inspect plants for pest damage. Use neem oil spray if needed.',
       ),
       const Suggestion(
         category: 'pest_control',
         crop: 'Cotton',
         priority: 'Medium',
-        text: 'Check for bollworm infestation. Apply biological pesticide if required.',
+        text:
+            'Check for bollworm infestation. Apply biological pesticide if required.',
       ),
     ];
   }
@@ -194,14 +207,17 @@ class _UserService {
     try {
       final response = await http
           .get(
-            Uri.parse('http://agrihive-server91.onrender.com/get_farmer_profile?userId=$userId&field=name'),
+            // ✅ FIX: Changed 'http' to 'https'
+            Uri.parse(
+              'https://agrihive-server91.onrender.com/get_farmer_profile?userId=$userId&field=name',
+            ),
             headers: {'Content-Type': 'application/json'},
           )
           .timeout(_Constants.apiTimeout);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        
+
         if (jsonData.containsKey('name')) {
           String fullName = jsonData['name'] ?? 'User';
           return fullName.split(' ').first;
@@ -209,11 +225,13 @@ class _UserService {
           throw Exception('Name field not found in response');
         }
       } else {
-        throw HttpException('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        throw HttpException(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
     } catch (e) {
       debugPrint('❌ Error fetching user name: $e');
-      rethrow;
+      return 'User';
     }
   }
 }
@@ -223,29 +241,29 @@ class HomePage extends StatefulWidget {
   final dynamic userId;
 
   const HomePage({super.key, required this.userId});
-  
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final WeatherService _weatherService = WeatherService();
-  
+
   // State variables
   Map<String, dynamic> weatherData = {};
   bool isLoading = false;
   List<Suggestion> suggestions = [];
   Map<String, Suggestion> _suggestionsByCategory = {};
   String userName = 'User';
-  
+
   // Animation controllers
   late AnimationController _headerAnimationController;
   late AnimationController _cardsAnimationController;
   late Animation<Offset> _headerSlideAnimation;
   late Animation<double> _cardsFadeAnimation;
-  
+
   static bool _hasAnimatedOnce = false;
-  
+
   late final String formattedDate;
 
   @override
@@ -277,18 +295,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _headerSlideAnimation = Tween<Offset>(
       begin: _hasAnimatedOnce ? Offset.zero : const Offset(0, -1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _headerAnimationController,
-      curve: Curves.easeOut, // More noticeable curve
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _headerAnimationController,
+        curve: Curves.easeOut, // More noticeable curve
+      ),
+    );
 
     _cardsFadeAnimation = Tween<double>(
       begin: _hasAnimatedOnce ? 1.0 : 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _cardsAnimationController, 
-      curve: Curves.easeInOut, // Smoother curve
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _cardsAnimationController,
+        curve: Curves.easeInOut, // Smoother curve
+      ),
+    );
 
     _startAnimations();
   }
@@ -311,7 +333,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       _loadUserName(),
       _loadWeatherData(),
       _loadSuggestionsData(),
-    // ignore: body_might_complete_normally_catch_error
+      // ignore: body_might_complete_normally_catch_error
     ]).catchError((error) {
       debugPrint('Error loading data: $error');
     });
@@ -327,8 +349,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   // User name methods
   Future<void> _loadUserName() async {
-    final cachedName = await _CacheService.getCachedData(_Constants.userNameCacheKey);
-    final isCacheValid = await _CacheService.isCacheValid(_Constants.lastUserFetchTimeKey);
+    final cachedName = await _CacheService.getCachedData(
+      _Constants.userNameCacheKey,
+    );
+    final isCacheValid = await _CacheService.isCacheValid(
+      _Constants.lastUserFetchTimeKey,
+    );
 
     if (cachedName != null && cachedName.isNotEmpty) {
       if (mounted) {
@@ -344,8 +370,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Future<void> _fetchUserName() async {
     try {
-      final fetchedName = await _UserService.fetchUserName(widget.userId.toString());
-      
+      final fetchedName = await _UserService.fetchUserName(
+        widget.userId.toString(),
+      );
+
       await Future.wait([
         _CacheService.cacheData(_Constants.userNameCacheKey, fetchedName),
         _CacheService.setCacheTimestamp(_Constants.lastUserFetchTimeKey),
@@ -364,7 +392,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Weather data methods
   Future<void> _loadWeatherData() async {
     final cachedData = await _loadCachedWeatherData();
-    final isCacheValid = await _CacheService.isCacheValid(_Constants.lastFetchTimeKey);
+    final isCacheValid = await _CacheService.isCacheValid(
+      _Constants.lastFetchTimeKey,
+    );
 
     if (cachedData != null) {
       if (mounted) {
@@ -381,7 +411,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Future<Map<String, dynamic>?> _loadCachedWeatherData() async {
     try {
-      final cachedDataString = await _CacheService.getCachedData(_Constants.weatherCacheKey);
+      final cachedDataString = await _CacheService.getCachedData(
+        _Constants.weatherCacheKey,
+      );
       if (cachedDataString != null) {
         return json.decode(cachedDataString) as Map<String, dynamic>;
       }
@@ -407,7 +439,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         };
 
         await Future.wait([
-          _CacheService.cacheData(_Constants.weatherCacheKey, json.encode(transformedData)),
+          _CacheService.cacheData(
+            _Constants.weatherCacheKey,
+            json.encode(transformedData),
+          ),
           _CacheService.setCacheTimestamp(_Constants.lastFetchTimeKey),
         ]);
 
@@ -420,7 +455,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       } else {
         if (mounted) {
           setState(() {
-            weatherData = {'error': data?['error'] ?? 'No weather data received'};
+            weatherData = {
+              'error': data?['error'] ?? 'No weather data received',
+            };
             isLoading = false;
           });
         }
@@ -452,7 +489,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         };
 
         await Future.wait([
-          _CacheService.cacheData(_Constants.weatherCacheKey, json.encode(transformedData)),
+          _CacheService.cacheData(
+            _Constants.weatherCacheKey,
+            json.encode(transformedData),
+          ),
           _CacheService.setCacheTimestamp(_Constants.lastFetchTimeKey),
         ]);
 
@@ -477,22 +517,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Suggestions data methods
   Future<void> _loadSuggestionsData() async {
     final cachedSuggestions = await _loadCachedSuggestions();
-    final isCacheValid = await _CacheService.isCacheValid(_Constants.lastSuggestionsFetchTimeKey);
+    final isCacheValid = await _CacheService.isCacheValid(
+      _Constants.lastSuggestionsFetchTimeKey,
+    );
 
     if (cachedSuggestions != null && cachedSuggestions.isNotEmpty) {
       _updateSuggestionsState(cachedSuggestions);
-      if (isCacheValid) return;
     }
-
+    if (isCacheValid) return;
     await _fetchSuggestions();
   }
 
   Future<List<Suggestion>?> _loadCachedSuggestions() async {
     try {
-      final cachedString = await _CacheService.getCachedData(_Constants.suggestionsCacheKey);
+      final cachedString = await _CacheService.getCachedData(
+        _Constants.suggestionsCacheKey,
+      );
       if (cachedString != null) {
         final jsonList = json.decode(cachedString) as List<dynamic>;
-        return jsonList.map((json) => Suggestion.fromJson(json as Map<String, dynamic>)).toList();
+        return jsonList
+            .map((json) => Suggestion.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
     } catch (e) {
       debugPrint('Error loading cached suggestions: $e');
@@ -502,14 +547,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Future<void> _fetchSuggestions() async {
     try {
-      final fetchedSuggestions = await _SuggestionsService.fetchSuggestions(widget.userId.toString());
+      final fetchedSuggestions = await _SuggestionsService.fetchSuggestions(
+        widget.userId.toString(),
+      );
       await _cacheSuggestions(fetchedSuggestions);
       _updateSuggestionsState(fetchedSuggestions);
     } catch (e) {
-      debugPrint('🔄 Falling back to mock data due to error: $e');
-      final mockSuggestions = _SuggestionsService.getMockSuggestions();
-      await _cacheSuggestions(mockSuggestions);
-      _updateSuggestionsState(mockSuggestions);
+      debugPrint('Error fetching suggestions: $e');
+
+      if (suggestions.isEmpty) {
+        debugPrint('🔄 Falling back to mock data because list is empty');
+        final mockSuggestions = _SuggestionsService.getMockSuggestions();
+        _updateSuggestionsState(mockSuggestions);
+      }
     }
   }
 
@@ -531,7 +581,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     try {
       final jsonList = suggestions.map((s) => s.toJson()).toList();
       await Future.wait([
-        _CacheService.cacheData(_Constants.suggestionsCacheKey, json.encode(jsonList)),
+        _CacheService.cacheData(
+          _Constants.suggestionsCacheKey,
+          json.encode(jsonList),
+        ),
         _CacheService.setCacheTimestamp(_Constants.lastSuggestionsFetchTimeKey),
       ]);
     } catch (e) {
@@ -581,9 +634,7 @@ class _BackgroundWidget extends StatelessWidget {
           fit: BoxFit.cover,
         ),
       ),
-      foregroundDecoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-      ),
+      foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(0.2)),
     );
   }
 }
@@ -686,9 +737,10 @@ class _BodyContentWidget extends StatelessWidget {
   });
 
   Widget _buildCategoryLabel(String category) {
-    final config = _Constants.categoryConfig[category.toLowerCase()] ?? 
-                   const _CategoryData(Icons.info_outline, Colors.orange);
-    
+    final config =
+        _Constants.categoryConfig[category.toLowerCase()] ??
+        const _CategoryData(Icons.info_outline, Colors.orange);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -703,7 +755,11 @@ class _BodyContentWidget extends StatelessWidget {
             size: 12,
             color: config.color,
             shadows: const [
-              Shadow(offset: Offset(1, 1), blurRadius: 3, color: Colors.black54),
+              Shadow(
+                offset: Offset(1, 1),
+                blurRadius: 3,
+                color: Colors.black54,
+              ),
             ],
           ),
           const SizedBox(width: 4),
@@ -714,7 +770,11 @@ class _BodyContentWidget extends StatelessWidget {
               fontWeight: FontWeight.w500,
               color: Colors.white,
               shadows: [
-                Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+                Shadow(
+                  offset: Offset(1, 1),
+                  blurRadius: 2,
+                  color: Colors.black87,
+                ),
               ],
             ),
           ),
@@ -737,21 +797,22 @@ class _BodyContentWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE6A919), width: 1),
       ),
-      child: suggestion != null
-          ? _SuggestionContent(
-              suggestion: suggestion,
-              buildCategoryLabel: _buildCategoryLabel,
-            )
-          : const Center(
-              child: Text(
-                'Loading...',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w400,
+      child:
+          suggestion != null
+              ? _SuggestionContent(
+                suggestion: suggestion,
+                buildCategoryLabel: _buildCategoryLabel,
+              )
+              : const Center(
+                child: Text(
+                  'Loading...',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
               ),
-            ),
     );
   }
 
@@ -765,10 +826,7 @@ class _BodyContentWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            WeatherCard(
-              weatherData: weatherData,
-              isLoading: isLoading,
-            ),
+            WeatherCard(weatherData: weatherData, isLoading: isLoading),
             const SizedBox(height: 10),
             FadeTransition(
               opacity: cardsAnimation,
@@ -782,9 +840,15 @@ class _BodyContentWidget extends StatelessWidget {
                         child: Column(
                           children: [
                             _buildSuggestionCard(
-                              suggestion: suggestions.isNotEmpty ? suggestions[0] : null,
+                              suggestion:
+                                  suggestions.isNotEmpty
+                                      ? suggestions[0]
+                                      : null,
                               height: 130,
-                              margin: const EdgeInsets.only(right: 8, bottom: 8),
+                              margin: const EdgeInsets.only(
+                                right: 8,
+                                bottom: 8,
+                              ),
                             ),
                             _buildSuggestionCard(
                               suggestion: suggestionsByCategory['care'],
@@ -851,7 +915,11 @@ class _SuggestionContent extends StatelessWidget {
                   color: Colors.white,
                   height: 1.3,
                   shadows: [
-                    Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+                    Shadow(
+                      offset: Offset(1, 1),
+                      blurRadius: 2,
+                      color: Colors.black87,
+                    ),
                   ],
                 ),
               ),
@@ -873,7 +941,11 @@ class _SuggestionContent extends StatelessWidget {
               fontSize: 13,
               color: Colors.white,
               shadows: [
-                Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+                Shadow(
+                  offset: Offset(1, 1),
+                  blurRadius: 2,
+                  color: Colors.black87,
+                ),
               ],
             ),
           ),
@@ -884,7 +956,11 @@ class _SuggestionContent extends StatelessWidget {
               fontWeight: FontWeight.w400,
               color: Colors.white,
               shadows: [
-                Shadow(offset: Offset(1, 1), blurRadius: 2, color: Colors.black87),
+                Shadow(
+                  offset: Offset(1, 1),
+                  blurRadius: 2,
+                  color: Colors.black87,
+                ),
               ],
             ),
           ),

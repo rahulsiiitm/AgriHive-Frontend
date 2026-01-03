@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http_parser/http_parser.dart';
-// import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 // ignore: depend_on_referenced_packages
 import 'package:mime/mime.dart';
@@ -22,7 +21,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _notificationsEnabled = true;
   late String userId;
   Map<String, dynamic>? profileData;
-  // final ImagePicker _picker = ImagePicker();
   final String apiBaseUrl = 'https://agrihive-server91.onrender.com';
 
   // Cache variables
@@ -36,6 +34,14 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     userId = widget.userId ?? FirebaseAuth.instance.currentUser?.uid ?? 'user1';
     _loadProfileFromCache();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    });
   }
 
   void _loadProfileFromCache() {
@@ -50,80 +56,74 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-Future<void> _loadProfile({bool forceRefresh = false}) async {
-  if (_isLoading && !forceRefresh) return;
+  Future<void> _loadProfile({bool forceRefresh = false}) async {
+    if (_isLoading && !forceRefresh) return;
 
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    final response = await http.get(
-      Uri.parse('$apiBaseUrl/get_farmer_profile?userId=$userId'),
-    );
-
-    if (response.statusCode == 200) {
-      final newProfileData = json.decode(response.body)['profile'];
-      setState(() {
-        profileData = newProfileData;
-        _cachedProfileData = newProfileData;
-        _lastLoadTime = DateTime.now();
-      });
-    } else if (response.statusCode == 404) {
-      // 👇 Just show empty profile with default values
-      setState(() {
-        profileData = {
-          'name': 'No data',
-          'location': 'No data',
-          'phone': '',
-          'language': 'English',
-          'profilePhoto': null,
-        };
-      });
-    }
-  } catch (e) {
-    _showSnackBar('Failed to load profile');
-  } finally {
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
-  }
-}
 
+    try {
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/get_farmer_profile?userId=$userId'),
+      );
 
-Future<bool> updateProfile(Map<String, dynamic> updates) async {
-  try {
-    print('🔵 Sending update request for userId: $userId');
-    print('🔵 Updates: $updates');
-
-    final response = await http.post(
-      Uri.parse('$apiBaseUrl/update_farmer_profile'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'userId': userId, 'updates': updates}),
-    );
-
-    print('🟡 Status Code: ${response.statusCode}');
-    print('🟡 Response Body: ${response.body}');
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200) {
+        final newProfileData = json.decode(response.body)['profile'];
+        setState(() {
+          profileData = newProfileData;
+          _cachedProfileData = newProfileData;
+          _lastLoadTime = DateTime.now();
+        });
+      } else if (response.statusCode == 404) {
+        setState(() {
+          profileData = {
+            'name': 'No data',
+            'location': 'No data',
+            'phone': '',
+            'language': 'English',
+            'profilePhoto': null,
+          };
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Failed to load profile');
+    } finally {
       setState(() {
-        profileData = {...?profileData, ...updates};
-        _cachedProfileData = profileData;
-        _lastLoadTime = DateTime.now();
+        _isLoading = false;
       });
-      return true;
-    } else {
-      final error = json.decode(response.body);
-      print('🔴 Server error: $error');
     }
-
-    return false;
-  } catch (e) {
-    print('🔴 Exception in updateProfile: $e');
-    return false;
   }
-}
 
+  Future<bool> updateProfile(Map<String, dynamic> updates) async {
+    try {
+      if (updates.containsKey('language')) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('app_language', updates['language']);
+      }
+
+      print('🔵 Sending update request for userId: $userId');
+
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/update_farmer_profile'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'userId': userId, 'updates': updates}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() {
+          profileData = {...?profileData, ...updates};
+          _cachedProfileData = profileData;
+          _lastLoadTime = DateTime.now();
+        });
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('🔴 Exception in updateProfile: $e');
+      return false;
+    }
+  }
 
   Future<bool> uploadPhoto(File imageFile) async {
     try {
@@ -149,19 +149,13 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
 
   Future<void> _performLogout() async {
     try {
-      // Clear cached data first
       _cachedProfileData = null;
       _lastLoadTime = null;
-
-      // Clear SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-
-      // Sign out from Firebase - this will automatically trigger AuthWrapper
       await FirebaseAuth.instance.signOut();
     } catch (e) {
       _showSnackBar('Logout failed. Please try again.');
-      print('Logout error: $e');
     }
   }
 
@@ -251,10 +245,9 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
                       letterSpacing: 0.5,
                     ),
                     textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis, // ✅ Prevent overflow
+                    overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
-
                   SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -273,7 +266,7 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
-                          overflow: TextOverflow.ellipsis, // ✅ Prevent overflow
+                          overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                           textAlign: TextAlign.center,
                         ),
@@ -358,7 +351,6 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
           bottom: 0,
           right: 0,
           child: GestureDetector(
-            // onTap: _editPhoto,
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -412,7 +404,6 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
               _showPrivacyDialog,
             ),
           ]),
-
           SizedBox(height: 16),
           _buildMenuItem(
             Icons.logout,
@@ -571,10 +562,6 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.green[600]!),
-                    ),
                   ),
                 ),
                 SizedBox(height: 16),
@@ -584,10 +571,6 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
                     labelText: 'Location',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.green[600]!),
                     ),
                   ),
                 ),
@@ -599,10 +582,6 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
                     labelText: 'Phone',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.green[600]!),
                     ),
                   ),
                 ),
@@ -644,19 +623,6 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
     );
   }
 
-  // void _editPhoto() async {
-  //   final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-  //   if (pickedFile != null) {
-  //     final uploaded = await uploadPhoto(File(pickedFile.path));
-  //     if (uploaded) {
-  //       _loadProfile(forceRefresh: true);
-  //       _showSnackBar('Profile photo updated!');
-  //     } else {
-  //       _showSnackBar('Photo upload failed');
-  //     }
-  //   }
-  // }
-
   void _showNotifications() {
     showDialog(
       context: context,
@@ -671,16 +637,56 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
                     'Notifications',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  content: SwitchListTile(
-                    title: Text('Push Notifications'),
-                    subtitle: Text(
-                      'Receive weather alerts and crop advisories',
-                    ),
-                    value: _notificationsEnabled,
-                    activeColor: Colors.green[600],
-                    onChanged:
-                        (value) =>
-                            setState(() => _notificationsEnabled = value),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 🔴 ALERT FOR USER
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.orange[800],
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                "This feature is coming soon.",
+                                style: TextStyle(
+                                  color: Colors.orange[900],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Push Notifications'),
+                        subtitle: Text(
+                          'Receive weather alerts and crop advisories',
+                        ),
+                        value: _notificationsEnabled,
+                        activeColor: Colors.green[600],
+                        onChanged: (value) async {
+                          setState(() => _notificationsEnabled = value);
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('notifications_enabled', value);
+                        },
+                      ),
+                    ],
                   ),
                   actions: [
                     ElevatedButton(
@@ -717,22 +723,49 @@ Future<bool> updateProfile(Map<String, dynamic> updates) async {
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
-              children:
-                  languages
-                      .map(
-                        (language) => RadioListTile<String>(
-                          title: Text(language),
-                          value: language,
-                          groupValue: selectedLanguage,
-                          activeColor: Colors.green[600],
-                          onChanged: (value) async {
-                            Navigator.pop(context);
-                            await updateProfile({'language': value});
-                            _showSnackBar('Language changed to $value');
-                          },
+              children: [
+                // 🔴 ALERT FOR USER
+                Container(
+                  margin: EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.translate, color: Colors.blue[800], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "App text will remain in English. Translation is under development.",
+                          style: TextStyle(
+                            color: Colors.blue[900],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      )
-                      .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                ...languages
+                    .map(
+                      (language) => RadioListTile<String>(
+                        title: Text(language),
+                        value: language,
+                        groupValue: selectedLanguage,
+                        activeColor: Colors.green[600],
+                        onChanged: (value) async {
+                          Navigator.pop(context);
+                          await updateProfile({'language': value});
+                          _showSnackBar('Language preference saved: $value');
+                        },
+                      ),
+                    )
+                    .toList(),
+              ],
             ),
             actions: [
               TextButton(

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_app/home.dart';
 import 'package:my_app/profile_page.dart';
+
+import 'firebase_options.dart';
 
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -11,7 +14,9 @@ import 'management.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(MyApp());
 }
 
@@ -22,6 +27,41 @@ class MyApp extends StatelessWidget {
       title: 'AgriHive App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.green, fontFamily: 'lufga'),
+      // ---------------------------------------------------------
+      //"Phone Emulator" Style for Web
+      // ---------------------------------------------------------
+      builder: (context, child) {
+        if (kIsWeb) {
+          return Center(
+            child: Container(
+              // 1. Standard Phone Width (iPhone 11/12/13/14 Pro is ~390px, SE is 375px)
+              constraints: const BoxConstraints(maxWidth: 375, maxHeight: 800),
+
+              decoration: BoxDecoration(
+                color: Colors.white,
+                // 2. Rounded corners for the "phone body"
+                borderRadius: BorderRadius.circular(35),
+                // 3. Thick Black Bezel
+                border: Border.all(color: Colors.black, width: 7),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 30,
+                    offset: const Offset(0, 20),
+                  ),
+                ],
+              ),
+              // 4. Clip the app content to fit inside the rounded corners
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: child,
+              ),
+            ),
+          );
+        }
+        return child!;
+      },
+      // ---------------------------------------------------------
       home: AuthWrapper(),
     );
   }
@@ -74,7 +114,7 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
       PlantationManagementPage(userId: widget.userId),
       SizedBox(), // FAB placeholder
       IoTPage(),
-      ProfilePage(userId: widget.userId), // Pass userId to ProfilePage
+      ProfilePage(userId: widget.userId),
     ];
   }
 
@@ -144,9 +184,10 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                     children: [
                       Icon(
                         _icons[adjustedIndex],
-                        color: _selectedIndex == index
-                            ? Color.fromARGB(255, 120, 255, 165)
-                            : Color(0xFFFFFFFF),
+                        color:
+                            _selectedIndex == index
+                                ? Color.fromARGB(255, 120, 255, 165)
+                                : Color(0xFFFFFFFF),
                       ),
                       SizedBox(height: 4),
                       Text(
@@ -154,9 +195,10 @@ class _AgriHiveNavWrapperState extends State<AgriHiveNavWrapper> {
                         style: TextStyle(
                           fontFamily: 'lufga',
                           fontSize: 8,
-                          color: _selectedIndex == index
-                              ? Color(0xFF4B9834)
-                              : Color(0xFFA0A0A0),
+                          color:
+                              _selectedIndex == index
+                                  ? Color(0xFF4B9834)
+                                  : Color(0xFFA0A0A0),
                         ),
                       ),
                     ],

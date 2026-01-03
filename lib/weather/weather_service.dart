@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
+import 'package:geocoding/geocoding.dart';
 
 class WeatherService {
   static const String baseUrl =
@@ -163,8 +164,32 @@ class WeatherService {
         weatherData = json.decode(response.body);
         print('Fetched fresh weather data from API');
 
-        // Add location info to the response
-        weatherData?['location'] = _getLocationName(lat, lon);
+        // --- NEW: Get Real Location Name ---
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+          if (placemarks.isNotEmpty) {
+            Placemark place = placemarks[0];
+            // Uses Locality (City) or SubAdministrativeArea (District)
+            String realName =
+                place.locality ??
+                place.subAdministrativeArea ??
+                'Unknown Location';
+            weatherData?['location'] = realName;
+          } else {
+            weatherData?['location'] = _getLocationName(
+              lat,
+              lon,
+            ); // Fallback to hardcoded
+          }
+        } catch (e) {
+          print('Geocoding error: $e');
+          weatherData?['location'] = _getLocationName(
+            lat,
+            lon,
+          ); // Fallback to hardcoded
+        }
+        // -----------------------------------
+
         weatherData?['coordinates'] = {'lat': lat, 'lon': lon};
       } else {
         throw Exception('API returned ${response.statusCode}');
