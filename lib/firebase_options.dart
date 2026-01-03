@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '421583588543',
     projectId: 'agrihive-c8f6b',
     storageBucket: 'agrihive-c8f6b.firebasestorage.app',
-    iosBundleId: 'com.example.chatapp',
+    iosBundleId: 'com.example.agrihive',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '421583588543',
     projectId: 'agrihive-c8f6b',
     storageBucket: 'agrihive-c8f6b.firebasestorage.app',
-    iosBundleId: 'com.example.chatapp',
+    iosBundleId: 'com.example.agrihive',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
